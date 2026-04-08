@@ -1,8 +1,8 @@
 # go-time
 
 [![CI and Release](https://github.com/ahxar/go-time/actions/workflows/ci-release.yml/badge.svg)](https://github.com/ahxar/go-time/actions/workflows/ci-release.yml)
-[![npm version](https://img.shields.io/npm/v/go-time)](https://www.npmjs.com/package/go-time)
-[![npm downloads](https://img.shields.io/npm/dm/go-time)](https://www.npmjs.com/package/go-time)
+[![npm version](https://img.shields.io/npm/v/%40ahxar%2Fgo-time)](https://www.npmjs.com/package/@ahxar/go-time)
+[![npm downloads](https://img.shields.io/npm/dm/%40ahxar%2Fgo-time)](https://www.npmjs.com/package/@ahxar/go-time)
 [![License](https://img.shields.io/github/license/ahxar/go-time)](LICENSE)
 
 Go-inspired time utilities for Node.js with TypeScript types and zero runtime dependencies.
@@ -25,7 +25,7 @@ Precision note: `go-time` is built on JavaScript `Date`, so wall-clock time valu
 ## Installation
 
 ```bash
-npm install go-time
+npm install @ahxar/go-time
 ```
 
 ## Requirements
@@ -46,7 +46,7 @@ import {
   since,
   sleep,
   unixMilli
-} from "go-time";
+} from "@ahxar/go-time";
 
 const started = now();
 
@@ -71,7 +71,7 @@ console.log(t3.unixMilli()); // 1700000000123n
 ### Duration
 
 ```ts
-import { Duration, Hour, Minute, Second, parseDuration } from "go-time";
+import { Duration, Hour, Minute, Second, parseDuration } from "@ahxar/go-time";
 
 const a = parseDuration("2h45m10.5s");
 const b = new Duration(90n * Second);
@@ -89,7 +89,15 @@ Supported units: `ms`, `s`, `m`, `h`.
 `Time` uses JavaScript `Date` under the hood, so parsing, formatting, constructors, and current-time reads only support millisecond precision.
 
 ```ts
-import { DateOnly, DateTime, Kitchen, RFC3339, parse, parseInLocation, fixedZone } from "go-time";
+import {
+  DateOnly,
+  DateTime,
+  Kitchen,
+  RFC3339,
+  parse,
+  parseInLocation,
+  fixedZone
+} from "@ahxar/go-time";
 
 const t = parse(RFC3339, "2026-04-08T09:10:11.123Z");
 
@@ -110,7 +118,7 @@ console.log(localClock.zone()); // { name: "PLUS2", offsetSeconds: 7200 }
 This makes elapsed-time measurement stable across wall-clock adjustments. Times created with `unix()`, `unixMilli()`, `date()`, or `parse()` do not include monotonic data.
 
 ```ts
-import { now, parseDuration, since, sleep, unix } from "go-time";
+import { now, parseDuration, since, sleep, unix } from "@ahxar/go-time";
 
 const started = now();
 await sleep(parseDuration("25ms"));
@@ -130,7 +138,7 @@ console.log(typeof wallOnly.unix()); // "bigint"
 ### Locations
 
 ```ts
-import { Local, UTC, fixedZone, loadLocation, now } from "go-time";
+import { Local, UTC, fixedZone, loadLocation, now } from "@ahxar/go-time";
 
 const t = now();
 
@@ -148,7 +156,7 @@ console.log(berlin.zone()); // e.g. { name: "Europe/Berlin", offsetSeconds: 7200
 ### Timers and Tickers
 
 ```ts
-import { newTicker, newTimer, parseDuration } from "go-time";
+import { newTicker, newTimer, parseDuration } from "@ahxar/go-time";
 
 const timer = newTimer(parseDuration("50ms"));
 const firedAt = await timer.C.recv();
