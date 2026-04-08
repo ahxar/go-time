@@ -84,4 +84,4 @@ jobs:
       - name: Publish package
         env:
           NODE_AUTH_TOKEN: ""
-        run: npm publish
+        run: npm publish --provenance --access public
