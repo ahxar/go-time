@@ -176,14 +176,15 @@ npm install
 
 Available scripts:
 
-- `npm run build` - compile TypeScript to `dist/`
-- `npm run clean` - remove `dist/`
+- `npm run build` - compile the publishable package to `dist/`
+- `npm run build:test` - compile source and tests to `dist-test/`
+- `npm run clean` - remove `dist/` and `dist-test/`
 - `npm run lint` - run ESLint on source and tests
 - `npm run lint:fix` - run ESLint with auto-fixes
 - `npm run format` - format files with Prettier
 - `npm run format:check` - verify formatting
 - `npm run typecheck` - TypeScript type checks without emitting files
-- `npm test` - build and run Node test suite from compiled output
+- `npm test` - build test artifacts and run the Node test suite from compiled output
 
 ## Contributing
 

@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
+import * as goTime from "../src/index.js";
+
 import {
   ANSIC,
   DateOnly,
@@ -31,6 +33,7 @@ import {
   since,
   Time,
   UTC,
+  type SupportedLayout,
   unixMilli,
   unix,
   until
@@ -69,8 +72,10 @@ test("monotonic subtraction uses monotonic clock when available", () => {
 });
 
 test("monotonic subtraction prefers monotonic milliseconds over wall clock", () => {
-  const earlierWallClock = new Time(1_000n, UTC, 100n);
-  const laterWallClock = new Time(5_000n, UTC, 125n);
+  const earlierWallClock = new Time(1_000n, UTC);
+  const laterWallClock = new Time(5_000n, UTC);
+  (earlierWallClock as unknown as { monotonicMilliseconds: bigint }).monotonicMilliseconds = 100n;
+  (laterWallClock as unknown as { monotonicMilliseconds: bigint }).monotonicMilliseconds = 125n;
 
   assert.equal(laterWallClock.sub(earlierWallClock).milliseconds(), 25n);
   assert.equal(earlierWallClock.sub(laterWallClock).milliseconds(), -25n);
@@ -155,7 +160,7 @@ test("format and parse roundtrip for supported layouts", () => {
   const zoned = date(2026, Month.April, 8, 12, 34, 56, 123, plus2);
 
   const cases: Array<{
-    layout: string;
+    layout: SupportedLayout;
     sample: string;
     t: ReturnType<typeof unix>;
     stableRoundtrip: boolean;
@@ -265,7 +270,9 @@ test("parse and format report errors for unsupported or invalid input", () => {
   const invalidCases: Array<{ layout: string; value: string }> = [
     { layout: RFC3339, value: "bad" },
     { layout: DateOnly, value: "2026/04/08" },
+    { layout: DateOnly, value: "2026-02-31" },
     { layout: DateTime, value: "not-a-date" },
+    { layout: DateTime, value: "2026-02-31 12:00:00" },
     { layout: ANSIC, value: "bad" },
     { layout: ANSIC, value: "Wed Foo  8 12:34:56 2026" },
     { layout: UnixDate, value: "bad" },
@@ -276,9 +283,13 @@ test("parse and format report errors for unsupported or invalid input", () => {
     { layout: RFC1123, value: "bad" },
     { layout: RFC1123Z, value: "bad" },
     { layout: TimeOnly, value: "25:00" },
+    { layout: TimeOnly, value: "25:00:00" },
     { layout: Kitchen, value: "15:04" },
+    { layout: Kitchen, value: "15:04PM" },
     { layout: Stamp, value: "Foo  8 12:34:56" },
+    { layout: Stamp, value: "Apr  8 99:34:56" },
     { layout: Stamp, value: "bad" },
+    { layout: StampMilli, value: "Apr  8 12:34:56.1000" },
     { layout: StampMilli, value: "bad" }
   ];
 
@@ -288,7 +299,12 @@ test("parse and format report errors for unsupported or invalid input", () => {
   }
 
   assert.throws(() => parse("NOPE", "x"));
-  assert.throws(() => unix(0n, 0n).format("NOPE"));
+  assert.throws(() => unix(0n, 0n).format("NOPE" as string));
+});
+
+test("public entrypoint omits unstable symbols", () => {
+  assert.equal("Layout" in goTime, false);
+  assert.equal("loadLocationFromTZData" in goTime, false);
 });
 
 test("zero values and relative time helpers behave consistently", async () => {

@@ -13,6 +13,7 @@ import {
   RubyDate,
   Stamp,
   StampMilli,
+  type SupportedLayout,
   TimeOnly,
   UnixDate
 } from "./layout.js";
@@ -48,6 +49,17 @@ export enum Weekday {
   Saturday
 }
 
+export interface DateFields {
+  year: number;
+  month: Month;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  millisecond: number;
+  location?: Location;
+}
+
 /**
  * An immutable point in time with millisecond precision.
  *
@@ -69,6 +81,18 @@ export class Time {
   private readonly loc: Location;
   private readonly monotonicMilliseconds: bigint | undefined;
 
+  /**
+   * Creates a wall-clock time with millisecond precision.
+   *
+   * Prefer {@link now}, {@link unix}, {@link unixMilli}, {@link date}, and
+   * {@link parse} for most callers.
+   *
+   * Publicly constructed `Time` values do not carry a monotonic reading.
+   *
+   * @param epochMilliseconds - Milliseconds since the Unix epoch.
+   * @param loc - The time zone location to associate with the instant.
+   */
+  constructor(epochMilliseconds: bigint, loc?: Location);
   constructor(epochMilliseconds: bigint, loc: Location = UTC, monotonicMilliseconds?: bigint) {
     this.epochMilliseconds = normalizeEpochMilliseconds(epochMilliseconds);
     this.loc = loc;
@@ -84,7 +108,7 @@ export class Time {
    * @param d - The duration to add. Negative values move the time backward.
    */
   add(d: Duration): Time {
-    return new Time(
+    return createTimeWithMonotonic(
       this.epochMilliseconds + d.milliseconds(),
       this.loc,
       this.monotonicMilliseconds
@@ -377,123 +401,23 @@ export class Time {
 
   /**
    * Returns a textual representation of the time value formatted according to
-   * the given layout string. Use the layout constants from `layout.ts` (e.g.
-   * {@link RFC3339}, {@link DateOnly}).
+   * the given layout.
    *
-   * @param layout - A layout constant from this package.
+   * For TypeScript callers, pass one of the exported layout constants such as
+   * {@link RFC3339} or {@link DateOnly}.
+   *
+   * @param layout - A supported layout constant.
    * @returns The formatted time string.
-   * @throws {Error} If the layout is not yet supported.
+   * @throws {Error} If the layout is unsupported.
    */
+  format(layout: SupportedLayout): string;
+  format(layout: string): string;
   format(layout: string): string {
-    if (layout === RFC3339) {
-      if (
-        this.loc.name === "UTC" ||
-        (this.loc.fixedOffsetSeconds === 0 && this.loc.name !== "Local")
-      ) {
-        const seconds = this.epochMilliseconds / MILLISECONDS_PER_SECOND;
-        const subSecondMilliseconds = this.epochMilliseconds % MILLISECONDS_PER_SECOND;
-        const normalizedSubSecondMilliseconds =
-          subSecondMilliseconds < 0n
-            ? subSecondMilliseconds + MILLISECONDS_PER_SECOND
-            : subSecondMilliseconds;
-        const epochMs = Number(seconds * 1000n);
-        const d = new Date(epochMs);
-
-        const year = d.getUTCFullYear();
-        const month = d.getUTCMonth() + 1;
-        const day = d.getUTCDate();
-        const hour = d.getUTCHours();
-        const minute = d.getUTCMinutes();
-        const second = d.getUTCSeconds();
-
-        const date = `${year}-${pad2(month)}-${pad2(day)}`;
-        const time = `${pad2(hour)}:${pad2(minute)}:${pad2(second)}`;
-
-        const ms = Number(normalizedSubSecondMilliseconds);
-        if (ms > 0) {
-          return `${date}T${time}.${ms.toString().padStart(3, "0")}Z`;
-        }
-        return `${date}T${time}Z`;
-      }
-
-      const local = getLocalComponents(this.epochMilliseconds, this.loc);
-      const date = `${local.year}-${pad2(local.month)}-${pad2(local.day)}`;
-      const time = `${pad2(local.hour)}:${pad2(local.minute)}:${pad2(local.second)}`;
-
-      const subSecondMilliseconds = this.epochMilliseconds % MILLISECONDS_PER_SECOND;
-      const normalizedSubSecondMilliseconds =
-        subSecondMilliseconds < 0n
-          ? subSecondMilliseconds + MILLISECONDS_PER_SECOND
-          : subSecondMilliseconds;
-      const ms = Number(normalizedSubSecondMilliseconds);
-      let timeStr = time;
-      if (ms > 0) {
-        timeStr += `.${ms.toString().padStart(3, "0")}`;
-      }
-
-      const offset = formatOffsetRfc3339(local.offset);
-      return `${date}T${timeStr}${offset}`;
+    const formatter = FORMATTERS[layout as SupportedLayout];
+    if (!formatter) {
+      throw new Error(`unsupported layout: ${layout}`);
     }
-    if (layout === DateOnly) {
-      const local = getLocalComponents(this.epochMilliseconds, this.loc);
-      return `${local.year}-${pad2(local.month)}-${pad2(local.day)}`;
-    }
-    if (layout === TimeOnly) {
-      const local = getLocalComponents(this.epochMilliseconds, this.loc);
-      return `${pad2(local.hour)}:${pad2(local.minute)}:${pad2(local.second)}`;
-    }
-    if (layout === ANSIC) {
-      return `${weekdayShortName(this.weekday())} ${monthShortName(this.month())} ${padSpace(this.day(), 2)} ${pad2(this.hour())}:${pad2(this.minute())}:${pad2(this.second())} ${this.year()}`;
-    }
-    if (layout === UnixDate) {
-      const [zoneName, offset] = this.zone();
-      return `${weekdayShortName(this.weekday())} ${monthShortName(this.month())} ${padSpace(this.day(), 2)} ${pad2(this.hour())}:${pad2(this.minute())}:${pad2(this.second())} ${zoneToken(zoneName, offset)} ${this.year()}`;
-    }
-    if (layout === RubyDate) {
-      const [, offset] = this.zone();
-      return `${weekdayShortName(this.weekday())} ${monthShortName(this.month())} ${pad2(this.day())} ${pad2(this.hour())}:${pad2(this.minute())}:${pad2(this.second())} ${formatOffset(offset)} ${this.year()}`;
-    }
-    if (layout === RFC822) {
-      const [zoneName, offset] = this.zone();
-      return `${pad2(this.day())} ${monthShortName(this.month())} ${pad2(this.year() % 100)} ${pad2(this.hour())}:${pad2(this.minute())} ${zoneToken(zoneName, offset)}`;
-    }
-    if (layout === RFC822Z) {
-      const [, offset] = this.zone();
-      return `${pad2(this.day())} ${monthShortName(this.month())} ${pad2(this.year() % 100)} ${pad2(this.hour())}:${pad2(this.minute())} ${formatOffset(offset)}`;
-    }
-    if (layout === RFC850) {
-      const [zoneName, offset] = this.zone();
-      return `${weekdayLongName(this.weekday())}, ${pad2(this.day())}-${monthShortName(this.month())}-${pad2(this.year() % 100)} ${pad2(this.hour())}:${pad2(this.minute())}:${pad2(this.second())} ${zoneToken(zoneName, offset)}`;
-    }
-    if (layout === RFC1123) {
-      const [zoneName, offset] = this.zone();
-      return `${weekdayShortName(this.weekday())}, ${pad2(this.day())} ${monthShortName(this.month())} ${this.year()} ${pad2(this.hour())}:${pad2(this.minute())}:${pad2(this.second())} ${zoneToken(zoneName, offset)}`;
-    }
-    if (layout === RFC1123Z) {
-      const [, offset] = this.zone();
-      return `${weekdayShortName(this.weekday())}, ${pad2(this.day())} ${monthShortName(this.month())} ${this.year()} ${pad2(this.hour())}:${pad2(this.minute())}:${pad2(this.second())} ${formatOffset(offset)}`;
-    }
-    if (layout === Kitchen) {
-      const hour = this.hour();
-      const minute = this.minute();
-      const ampm = hour >= 12 ? "PM" : "AM";
-      const h12 = hour % 12 === 0 ? 12 : hour % 12;
-      return `${h12}:${minute.toString().padStart(2, "0")}${ampm}`;
-    }
-    if (layout === Stamp) {
-      return `${monthShortName(this.month())} ${padSpace(this.day(), 2)} ${pad2(this.hour())}:${pad2(this.minute())}:${pad2(this.second())}`;
-    }
-    if (layout === StampMilli) {
-      const frac = this.millisecond().toString().padStart(3, "0");
-      return `${monthShortName(this.month())} ${padSpace(this.day(), 2)} ${pad2(this.hour())}:${pad2(this.minute())}:${pad2(this.second())}.${frac}`;
-    }
-    if (layout === DateTime) {
-      const local = getLocalComponents(this.epochMilliseconds, this.loc);
-      const date = `${local.year}-${pad2(local.month)}-${pad2(local.day)}`;
-      const time = `${pad2(local.hour)}:${pad2(local.minute)}:${pad2(local.second)}`;
-      return `${date} ${time}`;
-    }
-    throw new Error(`layout not implemented yet: ${layout}`);
+    return formatter(this);
   }
 
   /** Returns the time formatted as {@link RFC3339}. */
@@ -514,7 +438,7 @@ export class Time {
 export function now(): Time {
   const nowMs = BigInt(Date.now());
   const monotonicMs = BigInt(Math.trunc(performance.now()));
-  return new Time(nowMs, Local, monotonicMs);
+  return createTimeWithMonotonic(nowMs, Local, monotonicMs);
 }
 
 /**
@@ -540,49 +464,44 @@ export function unixMilli(ms: bigint): Time {
 }
 
 /**
- * Returns the {@link Time} corresponding to the given calendar fields in the
- * given location.
+ * Returns the {@link Time} corresponding to the given calendar fields.
  *
- * @param year - Four-digit year.
- * @param month - Month of the year (1 = January).
- * @param day - Day of the month.
- * @param hour - Hour of the day (0–23).
- * @param min - Minute of the hour (0–59).
- * @param sec - Second of the minute (0–59).
- * @param msec - Millisecond offset within the second.
- * @param loc - Location; defaults to {@link UTC}.
+ * Callers may use either positional arguments or an object literal.
+ *
+ * Positional form:
+ * `date(year, month, day, hour, minute, second, millisecond, location?)`
+ *
+ * Object form:
+ * `date({ year, month, day, hour, minute, second, millisecond, location })`
  */
 export function date(
-  year: number,
-  month: Month,
-  day: number,
-  hour: number,
-  min: number,
-  sec: number,
-  msec: number,
-  loc: Location = UTC
+  ...args: [DateFields] | [number, Month, number, number, number, number, number, Location?]
 ): Time {
-  if (loc.fixedOffsetSeconds !== undefined) {
+  const parts = normalizeDateFields(args);
+  const { year, month, day, hour, minute, second, millisecond, location = UTC } = parts;
+
+  if (location.fixedOffsetSeconds !== undefined) {
     const utcMs =
-      Date.UTC(year, month - 1, day, hour, min, sec, msec) - loc.fixedOffsetSeconds * 1_000;
-    return new Time(BigInt(utcMs), loc);
+      Date.UTC(year, month - 1, day, hour, minute, second, millisecond) -
+      location.fixedOffsetSeconds * 1_000;
+    return new Time(BigInt(utcMs), location);
   }
 
-  if (loc.name === "UTC") {
-    const ms = Date.UTC(year, month - 1, day, hour, min, sec, msec);
-    return new Time(BigInt(ms), loc);
+  if (location.name === "UTC") {
+    const ms = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
+    return new Time(BigInt(ms), location);
   }
 
-  if (loc.name === "Local") {
-    const localMs = new Date(year, month - 1, day, hour, min, sec, msec).getTime();
-    return new Time(BigInt(localMs), loc);
+  if (location.name === "Local") {
+    const localMs = new Date(year, month - 1, day, hour, minute, second, millisecond).getTime();
+    return new Time(BigInt(localMs), location);
   }
 
-  const guessUtc = Date.UTC(year, month - 1, day, hour, min, sec, msec);
+  const guessUtc = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
   const guessedDate = new Date(guessUtc);
-  const offset = getOffsetSecondsForZone(guessedDate, loc.name);
+  const offset = getOffsetSecondsForZone(guessedDate, location.name);
   const utcMs = guessUtc - offset * 1_000;
-  return new Time(BigInt(utcMs), loc);
+  return new Time(BigInt(utcMs), location);
 }
 
 /**
@@ -606,147 +525,42 @@ export function until(t: Time): Duration {
 /**
  * Parses a formatted string and returns the time value it represents.
  *
- * The `layout` specifies the format; use the constants from `layout.ts` (e.g.
- * {@link RFC3339}, {@link DateOnly}). Parsed times are always in {@link UTC}
+ * For TypeScript callers, pass one of the exported layout constants such as
+ * {@link RFC3339} or {@link DateOnly}. Parsed times are returned in {@link UTC}
  * unless the layout encodes an explicit offset.
  *
- * @param layout - A layout constant.
+ * @param layout - A supported layout constant.
  * @param value - The formatted time string.
  * @returns The parsed {@link Time} in UTC.
  * @throws {Error} If the value cannot be parsed with the given layout, or the
- *   layout is not yet supported.
+ *   layout is unsupported.
  */
+export function parse(layout: SupportedLayout, value: string): Time;
+export function parse(layout: string, value: string): Time;
 export function parse(layout: string, value: string): Time {
-  if (layout === RFC3339) {
-    const ms = Date.parse(value);
-    if (Number.isNaN(ms)) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-    return new Time(BigInt(ms), UTC);
+  const parser = PARSERS[layout as SupportedLayout];
+  if (!parser) {
+    throw new Error(`unsupported layout: ${layout}`);
   }
-
-  if (layout === DateOnly) {
-    const ms = Date.parse(`${value}T00:00:00.000Z`);
-    if (Number.isNaN(ms)) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-    return new Time(BigInt(ms), UTC);
-  }
-
-  if (layout === DateTime) {
-    const ms = Date.parse(value.replace(" ", "T") + "Z");
-    if (Number.isNaN(ms)) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-    return new Time(BigInt(ms), UTC);
-  }
-
-  if (layout === ANSIC) {
-    const m = /^(\w{3})\s+(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\s+(\d{4})$/.exec(value);
-    if (!m) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-
-    const monthToken = m[2]!;
-    const month = monthFromShortName(monthToken);
-    if (!month) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-
-    const ms = Date.UTC(
-      Number(m[7]),
-      month - 1,
-      Number(m[3]),
-      Number(m[4]),
-      Number(m[5]),
-      Number(m[6]),
-      0
-    );
-    return new Time(BigInt(ms), UTC);
-  }
-
-  if (
-    layout === UnixDate ||
-    layout === RubyDate ||
-    layout === RFC822 ||
-    layout === RFC822Z ||
-    layout === RFC850 ||
-    layout === RFC1123 ||
-    layout === RFC1123Z
-  ) {
-    const ms = Date.parse(value);
-    if (Number.isNaN(ms)) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-    return new Time(BigInt(ms), UTC);
-  }
-
-  if (layout === TimeOnly) {
-    const m = /^(\d{2}):(\d{2}):(\d{2})$/.exec(value);
-    if (!m) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-
-    const ms = Date.UTC(0, 0, 1, Number(m[1]), Number(m[2]), Number(m[3]), 0);
-    return new Time(BigInt(ms), UTC);
-  }
-
-  if (layout === Kitchen) {
-    const m = /^(\d{1,2}):(\d{2})(AM|PM)$/.exec(value);
-    if (!m) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-
-    const hourBase = Number(m[1]) % 12;
-    const hour = m[3] === "PM" ? hourBase + 12 : hourBase;
-    const minute = Number(m[2]);
-    const ms = Date.UTC(0, 0, 1, hour, minute, 0, 0);
-    return new Time(BigInt(ms), UTC);
-  }
-
-  if (layout === Stamp || layout === StampMilli) {
-    let base: RegExp;
-    if (layout === Stamp) {
-      base = /^(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})$/;
-    } else {
-      base = /^(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})$/;
-    }
-
-    const m = base.exec(value);
-    if (!m) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-
-    const monthToken = m[1]!;
-
-    const month = monthFromShortName(monthToken);
-    if (!month) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-
-    const day = Number(m[2]);
-    const hour = Number(m[3]);
-    const minute = Number(m[4]);
-    const second = Number(m[5]);
-    const ms = Date.UTC(0, month - 1, day, hour, minute, second, Number(m[6] ?? "0"));
-    return new Time(BigInt(ms), UTC);
-  }
-
-  throw new Error(`layout not implemented yet: ${layout}`);
+  return parser(value);
 }
 
 /**
  * Like {@link parse}, but interprets the result in the given location rather
- * than UTC. For layouts that already encode timezone information ({@link RFC3339}),
- * the explicit offset wins and the location is applied
- * afterward.
+ * than UTC.
  *
- * @param layout - A layout constant.
+ * For layouts that already encode timezone information ({@link RFC3339}), the
+ * explicit offset wins and the requested location is applied afterward.
+ *
+ * @param layout - A supported layout constant.
  * @param value - The formatted time string.
  * @param loc - The location to assign to the parsed time.
  * @returns The parsed {@link Time} in `loc`.
- * @throws {Error} If the value cannot be parsed with the given layout.
+ * @throws {Error} If the value cannot be parsed with the given layout, or the
+ *   layout is unsupported.
  */
+export function parseInLocation(layout: SupportedLayout, value: string, loc: Location): Time;
+export function parseInLocation(layout: string, value: string, loc: Location): Time;
 export function parseInLocation(layout: string, value: string, loc: Location): Time {
   if (layout === RFC3339) {
     return parse(layout, value).in(loc);
@@ -758,10 +572,17 @@ export function parseInLocation(layout: string, value: string, loc: Location): T
       throw new TypeError(`cannot parse time: ${value}`);
     }
 
-    const year = Number(m[1]);
-    const month = Number(m[2]);
-    const day = Number(m[3]);
-    return fromLocationClock(year, month, day, 0, 0, 0, loc);
+    const parts: DateTimeParts = {
+      year: Number(m[1]),
+      month: Number(m[2]),
+      day: Number(m[3]),
+      hour: 0,
+      minute: 0,
+      second: 0,
+      millisecond: 0
+    };
+    assertValidDateTimeParts(parts, value);
+    return fromLocationClock(parts.year, parts.month, parts.day, 0, 0, 0, loc);
   }
 
   if (layout === DateTime) {
@@ -770,33 +591,35 @@ export function parseInLocation(layout: string, value: string, loc: Location): T
       throw new TypeError(`cannot parse time: ${value}`);
     }
 
-    const year = Number(m[1]);
-    const month = Number(m[2]);
-    const day = Number(m[3]);
-    const hour = Number(m[4]);
-    const minute = Number(m[5]);
-    const second = Number(m[6]);
-    return fromLocationClock(year, month, day, hour, minute, second, loc);
+    const parts: DateTimeParts = {
+      year: Number(m[1]),
+      month: Number(m[2]),
+      day: Number(m[3]),
+      hour: Number(m[4]),
+      minute: Number(m[5]),
+      second: Number(m[6]),
+      millisecond: 0
+    };
+    assertValidDateTimeParts(parts, value);
+    return fromLocationClock(
+      parts.year,
+      parts.month,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+      loc
+    );
   }
 
   if (layout === TimeOnly) {
-    const m = /^(\d{2}):(\d{2}):(\d{2})$/.exec(value);
-    if (!m) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-
-    return fromLocationClock(0, 1, 1, Number(m[1]), Number(m[2]), Number(m[3]), loc);
+    const timeParts = parseTimeOnlyValue(value);
+    return fromLocationClock(1900, 1, 1, timeParts.hour, timeParts.minute, timeParts.second, loc);
   }
 
   if (layout === Kitchen) {
-    const m = /^(\d{1,2}):(\d{2})(AM|PM)$/.exec(value);
-    if (!m) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-
-    const hourBase = Number(m[1]) % 12;
-    const hour = m[3] === "PM" ? hourBase + 12 : hourBase;
-    return fromLocationClock(0, 1, 1, hour, Number(m[2]), 0, loc);
+    const kitchenParts = parseKitchenValue(value);
+    return fromLocationClock(1900, 1, 1, kitchenParts.hour, kitchenParts.minute, 0, loc);
   }
 
   return parse(layout, value).in(loc);
@@ -1024,6 +847,378 @@ function getLocalComponents(epochMilliseconds: bigint, loc: Location): LocalComp
 
 function normalizeEpochMilliseconds(epochMilliseconds: bigint): bigint {
   return epochMilliseconds;
+}
+
+interface DateTimeParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  millisecond: number;
+}
+
+interface ClockParts {
+  hour: number;
+  minute: number;
+  second: number;
+}
+
+type TimeFormatter = (time: Time) => string;
+type TimeParser = (value: string) => Time;
+
+const FORMATTERS: Record<SupportedLayout, TimeFormatter> = {
+  [RFC3339]: formatRfc3339,
+  [DateOnly]: formatDateOnly,
+  [TimeOnly]: formatTimeOnly,
+  [ANSIC]: formatAnsic,
+  [UnixDate]: formatUnixDate,
+  [RubyDate]: formatRubyDate,
+  [RFC822]: formatRfc822,
+  [RFC822Z]: formatRfc822Z,
+  [RFC850]: formatRfc850,
+  [RFC1123]: formatRfc1123,
+  [RFC1123Z]: formatRfc1123Z,
+  [Kitchen]: formatKitchen,
+  [Stamp]: formatStamp,
+  [StampMilli]: formatStampMilli,
+  [DateTime]: formatDateTime
+};
+
+const PARSERS: Record<SupportedLayout, TimeParser> = {
+  [RFC3339]: parseRfc3339Value,
+  [DateOnly]: parseDateOnlyValue,
+  [DateTime]: parseDateTimeValue,
+  [ANSIC]: parseAnsicValue,
+  [UnixDate]: parseDateParseValue,
+  [RubyDate]: parseDateParseValue,
+  [RFC822]: parseDateParseValue,
+  [RFC822Z]: parseDateParseValue,
+  [RFC850]: parseDateParseValue,
+  [RFC1123]: parseDateParseValue,
+  [RFC1123Z]: parseDateParseValue,
+  [TimeOnly]: parseTimeOnly,
+  [Kitchen]: parseKitchen,
+  [Stamp]: (value) => parseStampValue(value, false),
+  [StampMilli]: (value) => parseStampValue(value, true)
+};
+
+function createTimeWithMonotonic(
+  epochMilliseconds: bigint,
+  loc: Location,
+  monotonicMilliseconds: bigint | undefined
+): Time {
+  const time = new Time(epochMilliseconds, loc);
+  (time as unknown as { monotonicMilliseconds: bigint | undefined }).monotonicMilliseconds =
+    monotonicMilliseconds;
+  return time;
+}
+
+function normalizeDateFields(
+  args: [DateFields] | [number, Month, number, number, number, number, number, Location?]
+): DateFields {
+  if (typeof args[0] === "object") {
+    return args[0];
+  }
+
+  const [year, month, day, hour, minute, second, millisecond, location] = args as [
+    number,
+    Month,
+    number,
+    number,
+    number,
+    number,
+    number,
+    Location?
+  ];
+  return location === undefined
+    ? { year, month, day, hour, minute, second, millisecond }
+    : { year, month, day, hour, minute, second, millisecond, location };
+}
+
+function formatRfc3339(time: Time): string {
+  const location = time.location();
+  if (location.name === "UTC" || (location.fixedOffsetSeconds === 0 && location.name !== "Local")) {
+    const seconds = time.unixMilli() / MILLISECONDS_PER_SECOND;
+    const subSecondMilliseconds = time.unixMilli() % MILLISECONDS_PER_SECOND;
+    const normalizedSubSecondMilliseconds =
+      subSecondMilliseconds < 0n
+        ? subSecondMilliseconds + MILLISECONDS_PER_SECOND
+        : subSecondMilliseconds;
+    const utcDate = new Date(Number(seconds * 1000n));
+    const datePart = `${utcDate.getUTCFullYear()}-${pad2(utcDate.getUTCMonth() + 1)}-${pad2(utcDate.getUTCDate())}`;
+    const timePart = `${pad2(utcDate.getUTCHours())}:${pad2(utcDate.getUTCMinutes())}:${pad2(utcDate.getUTCSeconds())}`;
+    const ms = Number(normalizedSubSecondMilliseconds);
+    return ms > 0
+      ? `${datePart}T${timePart}.${ms.toString().padStart(3, "0")}Z`
+      : `${datePart}T${timePart}Z`;
+  }
+
+  const local = getLocalComponents(time.unixMilli(), location);
+  const datePart = `${local.year}-${pad2(local.month)}-${pad2(local.day)}`;
+  const baseTime = `${pad2(local.hour)}:${pad2(local.minute)}:${pad2(local.second)}`;
+  const subSecondMilliseconds = time.unixMilli() % MILLISECONDS_PER_SECOND;
+  const normalizedSubSecondMilliseconds =
+    subSecondMilliseconds < 0n
+      ? subSecondMilliseconds + MILLISECONDS_PER_SECOND
+      : subSecondMilliseconds;
+  const ms = Number(normalizedSubSecondMilliseconds);
+  const timePart = ms > 0 ? `${baseTime}.${ms.toString().padStart(3, "0")}` : baseTime;
+  return `${datePart}T${timePart}${formatOffsetRfc3339(local.offset)}`;
+}
+
+function formatDateOnly(time: Time): string {
+  const local = getLocalComponents(time.unixMilli(), time.location());
+  return `${local.year}-${pad2(local.month)}-${pad2(local.day)}`;
+}
+
+function formatTimeOnly(time: Time): string {
+  const local = getLocalComponents(time.unixMilli(), time.location());
+  return `${pad2(local.hour)}:${pad2(local.minute)}:${pad2(local.second)}`;
+}
+
+function formatAnsic(time: Time): string {
+  return `${weekdayShortName(time.weekday())} ${monthShortName(time.month())} ${padSpace(time.day(), 2)} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${time.year()}`;
+}
+
+function formatUnixDate(time: Time): string {
+  const [zoneName, offset] = time.zone();
+  return `${weekdayShortName(time.weekday())} ${monthShortName(time.month())} ${padSpace(time.day(), 2)} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${zoneToken(zoneName, offset)} ${time.year()}`;
+}
+
+function formatRubyDate(time: Time): string {
+  const [, offset] = time.zone();
+  return `${weekdayShortName(time.weekday())} ${monthShortName(time.month())} ${pad2(time.day())} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${formatOffset(offset)} ${time.year()}`;
+}
+
+function formatRfc822(time: Time): string {
+  const [zoneName, offset] = time.zone();
+  return `${pad2(time.day())} ${monthShortName(time.month())} ${pad2(time.year() % 100)} ${pad2(time.hour())}:${pad2(time.minute())} ${zoneToken(zoneName, offset)}`;
+}
+
+function formatRfc822Z(time: Time): string {
+  const [, offset] = time.zone();
+  return `${pad2(time.day())} ${monthShortName(time.month())} ${pad2(time.year() % 100)} ${pad2(time.hour())}:${pad2(time.minute())} ${formatOffset(offset)}`;
+}
+
+function formatRfc850(time: Time): string {
+  const [zoneName, offset] = time.zone();
+  return `${weekdayLongName(time.weekday())}, ${pad2(time.day())}-${monthShortName(time.month())}-${pad2(time.year() % 100)} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${zoneToken(zoneName, offset)}`;
+}
+
+function formatRfc1123(time: Time): string {
+  const [zoneName, offset] = time.zone();
+  return `${weekdayShortName(time.weekday())}, ${pad2(time.day())} ${monthShortName(time.month())} ${time.year()} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${zoneToken(zoneName, offset)}`;
+}
+
+function formatRfc1123Z(time: Time): string {
+  const [, offset] = time.zone();
+  return `${weekdayShortName(time.weekday())}, ${pad2(time.day())} ${monthShortName(time.month())} ${time.year()} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${formatOffset(offset)}`;
+}
+
+function formatKitchen(time: Time): string {
+  const hour = time.hour();
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const h12 = hour % 12 === 0 ? 12 : hour % 12;
+  return `${h12}:${time.minute().toString().padStart(2, "0")}${ampm}`;
+}
+
+function formatStamp(time: Time): string {
+  return `${monthShortName(time.month())} ${padSpace(time.day(), 2)} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())}`;
+}
+
+function formatStampMilli(time: Time): string {
+  return `${formatStamp(time)}.${time.millisecond().toString().padStart(3, "0")}`;
+}
+
+function formatDateTime(time: Time): string {
+  const local = getLocalComponents(time.unixMilli(), time.location());
+  return `${local.year}-${pad2(local.month)}-${pad2(local.day)} ${pad2(local.hour)}:${pad2(local.minute)}:${pad2(local.second)}`;
+}
+
+function parseWithDateParse(value: string): Time {
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  return new Time(BigInt(ms), UTC);
+}
+
+function parseRfc3339Value(value: string): Time {
+  return parseWithDateParse(value);
+}
+
+function parseDateOnlyValue(value: string): Time {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  const parts: DateTimeParts = {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+    hour: 0,
+    minute: 0,
+    second: 0,
+    millisecond: 0
+  };
+  return new Time(BigInt(createUtcTimestamp(parts, value)), UTC);
+}
+
+function parseDateTimeValue(value: string): Time {
+  const match = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/.exec(value);
+  if (!match) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  const parts: DateTimeParts = {
+    year: Number(match[1]),
+    month: Number(match[2]),
+    day: Number(match[3]),
+    hour: Number(match[4]),
+    minute: Number(match[5]),
+    second: Number(match[6]),
+    millisecond: 0
+  };
+  return new Time(BigInt(createUtcTimestamp(parts, value)), UTC);
+}
+
+function parseAnsicValue(value: string): Time {
+  const match = /^(\w{3})\s+(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\s+(\d{4})$/.exec(value);
+  if (!match) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  const month = monthFromShortName(match[2]!);
+  if (!month) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  const parts: DateTimeParts = {
+    year: Number(match[7]),
+    month,
+    day: Number(match[3]),
+    hour: Number(match[4]),
+    minute: Number(match[5]),
+    second: Number(match[6]),
+    millisecond: 0
+  };
+  return new Time(BigInt(createUtcTimestamp(parts, value)), UTC);
+}
+
+function parseDateParseValue(value: string): Time {
+  return parseWithDateParse(value);
+}
+
+function parseTimeOnlyValue(value: string): ClockParts {
+  const match = /^(\d{2}):(\d{2}):(\d{2})$/.exec(value);
+  if (!match) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  return {
+    hour: parseTimeComponent(match[1]!, 0, 23, value),
+    minute: parseTimeComponent(match[2]!, 0, 59, value),
+    second: parseTimeComponent(match[3]!, 0, 59, value)
+  };
+}
+
+function parseTimeOnly(value: string): Time {
+  const parts = parseTimeOnlyValue(value);
+  return new Time(BigInt(Date.UTC(0, 0, 1, parts.hour, parts.minute, parts.second, 0)), UTC);
+}
+
+function parseKitchenValue(value: string): ClockParts {
+  const match = /^(\d{1,2}):(\d{2})(AM|PM)$/.exec(value);
+  if (!match) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  const rawHour = parseTimeComponent(match[1]!, 1, 12, value);
+  return {
+    hour: match[3] === "PM" ? (rawHour % 12) + 12 : rawHour % 12,
+    minute: parseTimeComponent(match[2]!, 0, 59, value),
+    second: 0
+  };
+}
+
+function parseKitchen(value: string): Time {
+  const parts = parseKitchenValue(value);
+  return new Time(BigInt(Date.UTC(0, 0, 1, parts.hour, parts.minute, 0, 0)), UTC);
+}
+
+function parseStampValue(value: string, withMilliseconds: boolean): Time {
+  const pattern = withMilliseconds
+    ? /^(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})$/
+    : /^(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})$/;
+  const match = pattern.exec(value);
+  if (!match) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  const month = monthFromShortName(match[1]!);
+  if (!month) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  const parts: DateTimeParts = {
+    year: 1900,
+    month,
+    day: parseTimeComponent(match[2]!, 1, 31, value),
+    hour: parseTimeComponent(match[3]!, 0, 23, value),
+    minute: parseTimeComponent(match[4]!, 0, 59, value),
+    second: parseTimeComponent(match[5]!, 0, 59, value),
+    millisecond: parseTimeComponent(match[6] ?? "0", 0, 999, value)
+  };
+  return new Time(BigInt(createUtcTimestamp(parts, value)), UTC);
+}
+
+function parseTimeComponent(raw: string, min: number, max: number, value: string): number {
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  return parsed;
+}
+
+function assertValidDateTimeParts(parts: DateTimeParts, value: string): void {
+  const { year, month, day, hour, minute, second, millisecond } = parts;
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(month) ||
+    !Number.isInteger(day) ||
+    !Number.isInteger(hour) ||
+    !Number.isInteger(minute) ||
+    !Number.isInteger(second) ||
+    !Number.isInteger(millisecond)
+  ) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  if (month < 1 || month > 12) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+  if (millisecond < 0 || millisecond > 999 || day < 1 || day > 31) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+
+  const candidate = new Date(Date.UTC(0, month - 1, day, hour, minute, second, millisecond));
+  candidate.setUTCFullYear(year);
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() + 1 !== month ||
+    candidate.getUTCDate() !== day ||
+    candidate.getUTCHours() !== hour ||
+    candidate.getUTCMinutes() !== minute ||
+    candidate.getUTCSeconds() !== second ||
+    candidate.getUTCMilliseconds() !== millisecond
+  ) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+}
+
+function createUtcTimestamp(parts: DateTimeParts, value: string): number {
+  assertValidDateTimeParts(parts, value);
+  const { year, month, day, hour, minute, second, millisecond } = parts;
+  const date = new Date(Date.UTC(0, month - 1, day, hour, minute, second, millisecond));
+  date.setUTCFullYear(year);
+  return date.getTime();
 }
 
 export { parseDuration } from "./duration.js";

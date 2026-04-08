@@ -1,10 +1,9 @@
 /**
- * Layout strings used with {@link Time.format} and {@link parse}.
+ * Supported layout strings for {@link Time.format}, {@link parse}, and
+ * {@link parseInLocation}.
  *
- * Each constant is a reference time string in the Go `time` package convention,
- * where the reference moment is `Mon Jan 2 15:04:05 MST 2006` (Unix time
- * 1136239445). Pass these constants as the `layout` argument to format or parse
- * a `Time` value.
+ * These constants follow the Go `time` package reference-time convention,
+ * where the reference moment is `Mon Jan 2 15:04:05 MST 2006`.
  *
  * @example
  * ```ts
@@ -12,9 +11,6 @@
  * parse(DateOnly, "2026-04-08");
  * ```
  */
-
-/** General-purpose layout: `"01/02 03:04:05PM '06 -0700"`. */
-export const Layout = "01/02 03:04:05PM '06 -0700";
 /** ANSI C date format: `"Mon Jan _2 15:04:05 2006"`. */
 export const ANSIC = "Mon Jan _2 15:04:05 2006";
 /** Unix `date` command format: `"Mon Jan _2 15:04:05 MST 2006"`. */
@@ -45,3 +41,21 @@ export const DateTime = "2006-01-02 15:04:05";
 export const DateOnly = "2006-01-02";
 /** Time only: `"15:04:05"`. */
 export const TimeOnly = "15:04:05";
+
+/** Union of all layout constants supported by the public API. */
+export type SupportedLayout =
+  | typeof ANSIC
+  | typeof DateOnly
+  | typeof DateTime
+  | typeof Kitchen
+  | typeof RFC3339
+  | typeof RFC822
+  | typeof RFC822Z
+  | typeof RFC850
+  | typeof RFC1123
+  | typeof RFC1123Z
+  | typeof RubyDate
+  | typeof Stamp
+  | typeof StampMilli
+  | typeof TimeOnly
+  | typeof UnixDate;

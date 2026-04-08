@@ -5,7 +5,6 @@ export {
   DateOnly,
   DateTime,
   Kitchen,
-  Layout,
   RFC3339,
   RFC822,
   RFC822Z,
@@ -19,16 +18,12 @@ export {
   UnixDate
 } from "./layout.js";
 
-export {
-  Local,
-  Location,
-  UTC,
-  fixedZone,
-  loadLocation,
-  loadLocationFromTZData
-} from "./location.js";
+export type { SupportedLayout } from "./layout.js";
+
+export { Local, Location, UTC, fixedZone, loadLocation } from "./location.js";
 
 export {
+  type DateFields,
   Month,
   Time,
   Weekday,

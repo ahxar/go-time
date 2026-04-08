@@ -6,7 +6,6 @@ import {
   afterFunc,
   fixedZone,
   loadLocation,
-  loadLocationFromTZData,
   newTicker,
   newTimer,
   parseDuration,
@@ -28,7 +27,6 @@ test("location loading and fixed zones expose expected behavior", () => {
   assert.equal(fixed.toString(), "X");
 
   assert.throws(() => loadLocation("Not/A_Zone"));
-  assert.throws(() => loadLocationFromTZData("x", new Uint8Array([1, 2, 3])));
 });
 
 test("TimeChannel delivers to waiters, buffers values, and respects capacity", async () => {

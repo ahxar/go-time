@@ -11,6 +11,18 @@ export class Location {
    */
   readonly fixedOffsetSeconds: number | undefined;
 
+  /**
+   * Creates a low-level location object.
+   *
+   * Prefer {@link loadLocation} for validated IANA zones and
+   * {@link fixedZone} for fixed offsets.
+   *
+   * The constructor does not validate named zones.
+   *
+   * @param name - IANA zone name or descriptive label.
+   */
+  constructor(name: string);
+  constructor(name: string, fixedOffsetSeconds: number);
   constructor(name: string, fixedOffsetSeconds?: number) {
     this.name = name;
     this.fixedOffsetSeconds = fixedOffsetSeconds;
@@ -67,15 +79,4 @@ export function loadLocation(name: string): Location {
   } catch {
     throw new Error(`unknown time zone: ${name}`);
   }
-}
-
-/**
- * Not yet implemented. Throws an error in all cases.
- *
- * @throws {Error} Always — `LoadLocationFromTZData` is not implemented in v0.1.0.
- * @param _name - Unused.
- * @param _data - Unused.
- */
-export function loadLocationFromTZData(_name: string, _data: Uint8Array): never {
-  throw new Error("LoadLocationFromTZData is not implemented in v0.1.0");
 }
