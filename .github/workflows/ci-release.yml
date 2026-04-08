@@ -68,7 +68,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
           cache: npm
 
@@ -78,10 +78,5 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Clear NODE_AUTH_TOKEN for trusted publishing
-        run: echo "NODE_AUTH_TOKEN=" >> "$GITHUB_ENV"
-
       - name: Publish package
-        env:
-          NODE_AUTH_TOKEN: ""
-        run: npm publish --provenance --access public
+        run: npm publish
