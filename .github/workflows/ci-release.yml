@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   test:
-    name: Lint, Typecheck, Test (Node ${{ matrix.node }})
+    name: Lint, Check, Test (Node ${{ matrix.node }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -46,8 +46,11 @@ jobs:
       - name: Lint
         run: npm run lint
 
-      - name: Typecheck
-        run: npm run typecheck
+      - name: Format check
+        run: npm run fmt:check
+
+      - name: Check
+        run: npm run check
 
       - name: Test
         run: npm test

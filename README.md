@@ -45,7 +45,7 @@ import {
   parseDuration,
   since,
   sleep,
-  unixMilli
+  unixMilli,
 } from "@ahxar/go-time";
 
 const started = now();
@@ -96,7 +96,7 @@ import {
   RFC3339,
   parse,
   parseInLocation,
-  fixedZone
+  fixedZone,
 } from "@ahxar/go-time";
 
 const t = parse(RFC3339, "2026-04-08T09:10:11.123Z");
@@ -185,14 +185,12 @@ npm install
 Available scripts:
 
 - `npm run build` - compile the publishable package to `dist/`
-- `npm run build:test` - compile source and tests to `dist-test/`
-- `npm run clean` - remove `dist/` and `dist-test/`
-- `npm run lint` - run ESLint on source and tests
-- `npm run lint:fix` - run ESLint with auto-fixes
-- `npm run format` - format files with Prettier
-- `npm run format:check` - verify formatting
-- `npm run typecheck` - TypeScript type checks without emitting files
-- `npm test` - build test artifacts and run the Node test suite from compiled output
+- `npm run check` - TypeScript type checks without emitting files
+- `npm run fmt` - format supported files with Oxc
+- `npm run fmt:check` - verify formatting without writing changes
+- `npm run lint` - run Oxlint across the repository
+- `npm run lint:fix` - run Oxlint with auto-fixes
+- `npm test` - run the Vitest suite directly from the TypeScript test files
 
 ## Contributing
 
@@ -201,7 +199,7 @@ Contributions are welcome.
 1. Fork the repository.
 2. Create a feature branch.
 3. Add or update tests in `test/`.
-4. Run `npm run lint`, `npm run typecheck`, and `npm test`.
+4. Run `npm run lint`, `npm run check`, and `npm test`.
 5. Open a pull request describing your changes.
 
 ## License

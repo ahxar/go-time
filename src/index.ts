@@ -15,7 +15,7 @@ export {
   Stamp,
   StampMilli,
   TimeOnly,
-  UnixDate
+  UnixDate,
 } from "./layout.js";
 
 export type { SupportedLayout } from "./layout.js";
@@ -39,7 +39,7 @@ export {
   sleep,
   unix,
   unixMilli,
-  until
+  until,
 } from "./time.js";
 
 export { Ticker, Timer, after, afterFunc, newTicker, newTimer, tick } from "./timer.js";

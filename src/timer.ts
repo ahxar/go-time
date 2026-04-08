@@ -61,7 +61,7 @@ export class TimeChannel implements AsyncIterable<Time> {
 
   [Symbol.asyncIterator](): AsyncIterator<Time> {
     return {
-      next: async () => ({ done: false, value: await this.recv() })
+      next: async () => ({ done: false, value: await this.recv() }),
     };
   }
 }

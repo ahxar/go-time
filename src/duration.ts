@@ -20,7 +20,7 @@ const UNIT_TABLE: DurationUnit[] = [
   { suffix: "h", factor: Hour },
   { suffix: "m", factor: Minute },
   { suffix: "s", factor: Second },
-  { suffix: "ms", factor: Millisecond }
+  { suffix: "ms", factor: Millisecond },
 ];
 
 /**
