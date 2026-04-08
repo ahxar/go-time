@@ -171,46 +171,6 @@ for await (const tick of ticker.C) {
 }
 ```
 
-## Exported API
-
-### Duration APIs
-
-- `Duration`
-- `parseDuration(input)`
-- `Nanosecond`, `Microsecond`, `Millisecond`, `Second`, `Minute`, `Hour`
-
-### Time APIs
-
-- `Time`
-- `now()`
-- `date(year, month, day, hour, min, sec, nsec, loc?)`
-- `unix(sec, nsec?)`, `unixMilli(ms)`, `unixMicro(us)`
-- `parse(layout, value)`, `parseInLocation(layout, value, loc)`
-- `since(t)`, `until(t)`, `sleep(duration)`
-- `Month`, `Weekday`
-
-### Layout Constants
-
-- `Layout`, `ANSIC`, `UnixDate`, `RubyDate`
-- `RFC822`, `RFC822Z`, `RFC850`, `RFC1123`, `RFC1123Z`
-- `RFC3339`, `RFC3339Nano`
-- `Kitchen`, `Stamp`, `StampMilli`, `StampMicro`, `StampNano`
-- `DateTime`, `DateOnly`, `TimeOnly`
-
-### Location APIs
-
-- `Location`
-- `UTC`, `Local`
-- `fixedZone(name, offsetSeconds)`
-- `loadLocation(name)`
-- `loadLocationFromTZData(name, data)` (currently not implemented)
-
-### Timer APIs
-
-- `Timer`, `Ticker`
-- `newTimer(duration)`, `after(duration)`, `afterFunc(duration, fn)`
-- `newTicker(duration)`, `tick(duration)`
-
 ## Development
 
 Install dependencies:
