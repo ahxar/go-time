@@ -37,10 +37,11 @@ test("TimeChannel delivers to waiters, buffers values, and respects capacity", a
   const waiting = ch.recv();
   const sent = unix(1n, 0n);
   ch.push(sent);
-  assert.equal((await waiting).unixNano(), sent.unixNano());
+  assert.equal((await waiting).unixMilli(), sent.unixMilli());
 
-  ch.push(unix(2n, 0n));
-  ch.push(unix(3n, 0n));
+  for (const value of [unix(2n, 0n), unix(3n, 0n)]) {
+    ch.push(value);
+  }
   assert.equal((await ch.recv()).unix(), 2n);
 
   ch.push(unix(4n, 0n));
@@ -64,20 +65,20 @@ test("timer emits, can stop, and can reset", async () => {
 
   const firedTimer = newTimer(parseDuration("1ms"));
   const first = await firedTimer.C.recv();
-  assert.ok(first.unixNano() > 0n);
+  assert.ok(first.unixMilli() > 0n);
   assert.equal(firedTimer.stop(), false);
 
   const resetTimer = newTimer(parseDuration("20ms"));
   assert.equal(resetTimer.reset(parseDuration("1ms")), true);
   const afterReset = await resetTimer.C.recv();
-  assert.ok(afterReset.unixNano() > 0n);
+  assert.ok(afterReset.unixMilli() > 0n);
   assert.equal(resetTimer.reset(parseDuration("1ms")), false);
   await resetTimer.C.recv();
 });
 
 test("after and afterFunc schedule one-shot events", async () => {
   const when = await after(parseDuration("1ms"));
-  assert.ok(when.unixNano() > 0n);
+  assert.ok(when.unixMilli() > 0n);
 
   await new Promise<void>((resolve) => {
     const timer = afterFunc(parseDuration("1ms"), () => resolve());
@@ -92,7 +93,7 @@ test("ticker ticks, resets, and validates intervals", async () => {
   const ticker = newTicker(parseDuration("1ms"));
   const first = await ticker.C.recv();
   const second = await ticker.C.recv();
-  assert.ok(second.unixNano() >= first.unixNano());
+  assert.ok(second.unixMilli() >= first.unixMilli());
 
   const iter = ticker[Symbol.asyncIterator]();
   const iterTick = await iter.next();
@@ -100,7 +101,7 @@ test("ticker ticks, resets, and validates intervals", async () => {
 
   ticker.reset(parseDuration("1ms"));
   const afterReset = await ticker.C.recv();
-  assert.ok(afterReset.unixNano() > 0n);
+  assert.ok(afterReset.unixMilli() > 0n);
   ticker.stop();
   ticker.stop();
   assert.throws(() => ticker.reset(parseDuration("0s")));
@@ -124,7 +125,7 @@ test("tick returns null for non-positive durations and creates channel for posit
       continue;
     }
     if (typeof handle === "object" && handle !== null && "hasRef" in handle) {
-      clearInterval(handle as NodeJS.Timeout);
+      clearInterval(handle);
     }
   }
 });

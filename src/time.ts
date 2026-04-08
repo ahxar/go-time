@@ -10,20 +10,16 @@ import {
   RFC1123,
   RFC1123Z,
   RFC3339,
-  RFC3339Nano,
   RubyDate,
   Stamp,
-  StampMicro,
   StampMilli,
-  StampNano,
   TimeOnly,
   UnixDate
 } from "./layout.js";
 import { Duration } from "./duration.js";
 import { Local, Location, UTC } from "./location.js";
 
-const NS_PER_MS = 1_000_000n;
-const NS_PER_S = 1_000_000_000n;
+const MILLISECONDS_PER_SECOND = 1_000n;
 
 /** Represents a calendar month (January = 1 … December = 12). */
 export enum Month {
@@ -53,11 +49,11 @@ export enum Weekday {
 }
 
 /**
- * An immutable point in time with nanosecond precision.
+ * An immutable point in time with millisecond precision.
  *
- * Internally the value is stored as a signed 64-bit integer of nanoseconds
- * since the Unix epoch (UTC). An optional monotonic clock reading is captured
- * by {@link now} and used by {@link sub} for accurate elapsed-time
+ * Internally the value is stored as whole milliseconds since the Unix epoch
+ * (UTC), represented as a `bigint`. An optional monotonic clock reading is captured by
+ * {@link now} and used by {@link sub} for accurate elapsed-time
  * measurements that are unaffected by wall-clock adjustments.
  *
  * @example
@@ -69,14 +65,17 @@ export enum Weekday {
  * ```
  */
 export class Time {
-  private readonly epochNs: bigint;
+  private readonly epochMilliseconds: bigint;
   private readonly loc: Location;
-  private readonly monotonicNs: bigint | undefined;
+  private readonly monotonicMilliseconds: bigint | undefined;
 
-  constructor(epochNs: bigint, loc: Location = UTC, monotonicNs?: bigint) {
-    this.epochNs = epochNs;
+  constructor(epochMilliseconds: bigint, loc: Location = UTC, monotonicMilliseconds?: bigint) {
+    this.epochMilliseconds = normalizeEpochMilliseconds(epochMilliseconds);
     this.loc = loc;
-    this.monotonicNs = monotonicNs;
+    this.monotonicMilliseconds =
+      monotonicMilliseconds === undefined
+        ? undefined
+        : normalizeEpochMilliseconds(monotonicMilliseconds);
   }
 
   /**
@@ -85,7 +84,11 @@ export class Time {
    * @param d - The duration to add. Negative values move the time backward.
    */
   add(d: Duration): Time {
-    return new Time(this.epochNs + d.nanoseconds(), this.loc, this.monotonicNs);
+    return new Time(
+      this.epochMilliseconds + d.milliseconds(),
+      this.loc,
+      this.monotonicMilliseconds
+    );
   }
 
   /**
@@ -97,10 +100,10 @@ export class Time {
    * @param other - The time to subtract.
    */
   sub(other: Time): Duration {
-    if (this.monotonicNs !== undefined && other.monotonicNs !== undefined) {
-      return new Duration(this.monotonicNs - other.monotonicNs);
+    if (this.monotonicMilliseconds !== undefined && other.monotonicMilliseconds !== undefined) {
+      return new Duration(this.monotonicMilliseconds - other.monotonicMilliseconds);
     }
-    return new Duration(this.epochNs - other.epochNs);
+    return new Duration(this.epochMilliseconds - other.epochMilliseconds);
   }
 
   /**
@@ -109,7 +112,7 @@ export class Time {
    * @returns `-1` if `t < other`, `0` if `t == other`, `1` if `t > other`.
    */
   compare(other: Time): number {
-    const diff = this.sub(other).nanoseconds();
+    const diff = this.sub(other).milliseconds();
     if (diff < 0n) {
       return -1;
     }
@@ -136,22 +139,12 @@ export class Time {
 
   /** Returns the Unix timestamp in whole seconds. */
   unix(): bigint {
-    return this.epochNs / NS_PER_S;
+    return this.epochMilliseconds / MILLISECONDS_PER_SECOND;
   }
 
   /** Returns the Unix timestamp in whole milliseconds. */
   unixMilli(): bigint {
-    return this.epochNs / NS_PER_MS;
-  }
-
-  /** Returns the Unix timestamp in whole microseconds. */
-  unixMicro(): bigint {
-    return this.epochNs / 1_000n;
-  }
-
-  /** Returns the Unix timestamp in nanoseconds. */
-  unixNano(): bigint {
-    return this.epochNs;
+    return this.epochMilliseconds;
   }
 
   /**
@@ -161,12 +154,12 @@ export class Time {
    * @param d - The truncation unit.
    */
   truncate(d: Duration): Time {
-    const step = d.nanoseconds();
+    const step = d.milliseconds();
     if (step <= 0n) {
       return this;
     }
 
-    return new Time((this.epochNs / step) * step, this.loc);
+    return new Time((this.epochMilliseconds / step) * step, this.loc);
   }
 
   /**
@@ -177,26 +170,26 @@ export class Time {
    * @param d - The rounding unit.
    */
   round(d: Duration): Time {
-    const step = d.nanoseconds();
+    const step = d.milliseconds();
     if (step <= 0n) {
       return this;
     }
 
-    const rem = this.epochNs % step;
+    const rem = this.epochMilliseconds % step;
     if (rem === 0n) {
       return this;
     }
 
     const absRem = rem < 0n ? -rem : rem;
     if (absRem * 2n < step) {
-      return new Time(this.epochNs - rem, this.loc);
+      return new Time(this.epochMilliseconds - rem, this.loc);
     }
 
-    if (this.epochNs >= 0n) {
-      return new Time(this.epochNs + (step - rem), this.loc);
+    if (this.epochMilliseconds >= 0n) {
+      return new Time(this.epochMilliseconds + (step - rem), this.loc);
     }
 
-    return new Time(this.epochNs - (step + rem), this.loc);
+    return new Time(this.epochMilliseconds - (step + rem), this.loc);
   }
 
   /** Returns the {@link Location} associated with `t`. */
@@ -210,7 +203,7 @@ export class Time {
    * @param loc - The target location.
    */
   in(loc: Location): Time {
-    return new Time(this.epochNs, loc);
+    return new Time(this.epochMilliseconds, loc);
   }
 
   /** Returns a copy of `t` with the location set to {@link UTC}. */
@@ -248,39 +241,39 @@ export class Time {
     return [this.loc.name, offsetSeconds];
   }
 
-  /** Returns `true` if `t` is the zero time (epoch nanoseconds === 0). */
+  /** Returns `true` if `t` is the zero time (epoch milliseconds === 0). */
   isZero(): boolean {
-    return this.epochNs === 0n;
+    return this.epochMilliseconds === 0n;
   }
 
   /** Returns the four-digit year in which `t` occurs. */
   year(): number {
-    return this.toDate().getUTCFullYear();
+    return getLocalComponents(this.epochMilliseconds, this.loc).year;
   }
 
   /** Returns the month of the year in which `t` occurs. */
   month(): Month {
-    return (this.toDate().getUTCMonth() + 1) as Month;
+    return getLocalComponents(this.epochMilliseconds, this.loc).month as Month;
   }
 
   /** Returns the day of the month in which `t` occurs (1-based). */
   day(): number {
-    return this.toDate().getUTCDate();
+    return getLocalComponents(this.epochMilliseconds, this.loc).day;
   }
 
   /** Returns the hour within the day specified by `t` (0–23). */
   hour(): number {
-    return this.toDate().getUTCHours();
+    return getLocalComponents(this.epochMilliseconds, this.loc).hour;
   }
 
   /** Returns the minute offset within the hour specified by `t` (0–59). */
   minute(): number {
-    return this.toDate().getUTCMinutes();
+    return getLocalComponents(this.epochMilliseconds, this.loc).minute;
   }
 
   /** Returns the second offset within the minute specified by `t` (0–59). */
   second(): number {
-    return this.toDate().getUTCSeconds();
+    return getLocalComponents(this.epochMilliseconds, this.loc).second;
   }
 
   /**
@@ -289,8 +282,8 @@ export class Time {
    * @returns `[hour, minute, second]`.
    */
   clock(): [number, number, number] {
-    const d = this.toDate();
-    return [d.getUTCHours(), d.getUTCMinutes(), d.getUTCSeconds()];
+    const local = getLocalComponents(this.epochMilliseconds, this.loc);
+    return [local.hour, local.minute, local.second];
   }
 
   /**
@@ -299,26 +292,30 @@ export class Time {
    * @returns `[year, month, day]`.
    */
   date(): [number, Month, number] {
-    const d = this.toDate();
-    return [d.getUTCFullYear(), (d.getUTCMonth() + 1) as Month, d.getUTCDate()];
+    const local = getLocalComponents(this.epochMilliseconds, this.loc);
+    return [local.year, local.month as Month, local.day];
   }
 
-  /** Returns the nanosecond offset within the second specified by `t` (0–999,999,999). */
-  nanosecond(): number {
-    const mod = this.epochNs % NS_PER_S;
-    return Number(mod < 0n ? mod + NS_PER_S : mod);
+  /** Returns the millisecond offset within the second specified by `t` (0–999). */
+  millisecond(): number {
+    const mod = this.epochMilliseconds % MILLISECONDS_PER_SECOND;
+    const normalized = mod < 0n ? mod + MILLISECONDS_PER_SECOND : mod;
+    return Number(normalized);
   }
 
   /** Returns the day of the week in which `t` occurs. */
   weekday(): Weekday {
-    return this.toDate().getUTCDay() as Weekday;
+    const local = getLocalComponents(this.epochMilliseconds, this.loc);
+    const localDate = new Date(Date.UTC(local.year, local.month - 1, local.day));
+    return localDate.getUTCDay() as Weekday;
   }
 
   /** Returns the day of the year in which `t` occurs (1–366). */
   yearDay(): number {
-    const d = this.toDate();
-    const start = Date.UTC(d.getUTCFullYear(), 0, 1);
-    return Math.floor((d.getTime() - start) / 86_400_000) + 1;
+    const local = getLocalComponents(this.epochMilliseconds, this.loc);
+    const start = Date.UTC(local.year, 0, 1);
+    const day = Date.UTC(local.year, local.month - 1, local.day);
+    return Math.floor((day - start) / 86_400_000) + 1;
   }
 
   /**
@@ -327,8 +324,8 @@ export class Time {
    * @returns `[isoYear, week]` where `week` is in the range 1–53.
    */
   isoWeek(): [number, number] {
-    const d = this.toDate();
-    const weekDate = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+    const local = getLocalComponents(this.epochMilliseconds, this.loc);
+    const weekDate = new Date(Date.UTC(local.year, local.month - 1, local.day));
     const day = weekDate.getUTCDay() || 7;
     weekDate.setUTCDate(weekDate.getUTCDate() + 4 - day);
     const isoYear = weekDate.getUTCFullYear();
@@ -347,22 +344,35 @@ export class Time {
    * @param days - Days to add (may be negative).
    */
   addDate(years: number, months: number, days: number): Time {
-    const d = this.toDate();
-    const totalNs = this.nanosecond();
-    const msPart = Math.floor(totalNs / 1_000_000);
-    const subMsNs = BigInt(totalNs - msPart * 1_000_000);
+    const local = getLocalComponents(this.epochMilliseconds, this.loc);
+    const totalMs = this.millisecond();
 
-    const nextMs = Date.UTC(
-      d.getUTCFullYear() + years,
-      d.getUTCMonth() + months,
-      d.getUTCDate() + days,
-      d.getUTCHours(),
-      d.getUTCMinutes(),
-      d.getUTCSeconds(),
-      msPart
+    const nextDate = new Date(
+      Date.UTC(
+        local.year + years,
+        local.month - 1 + months,
+        local.day + days,
+        local.hour,
+        local.minute,
+        local.second,
+        totalMs
+      )
     );
 
-    return new Time(BigInt(nextMs) * NS_PER_MS + subMsNs, this.loc);
+    const result = new Time(BigInt(nextDate.getTime()), this.loc);
+
+    if (this.loc.fixedOffsetSeconds !== undefined) {
+      const offsetMs = this.loc.fixedOffsetSeconds * 1_000;
+      return new Time(result.epochMilliseconds - BigInt(offsetMs) * 1_000n, this.loc);
+    }
+
+    if (this.loc.name === "UTC" || this.loc.name === "Local") {
+      return result;
+    }
+
+    const offset = getOffsetSecondsForZone(nextDate, this.loc.name);
+    const offsetMs = offset * 1_000;
+    return new Time(result.epochMilliseconds - BigInt(offsetMs) * 1_000n, this.loc);
   }
 
   /**
@@ -376,16 +386,61 @@ export class Time {
    */
   format(layout: string): string {
     if (layout === RFC3339) {
-      return this.toDate().toISOString();
-    }
-    if (layout === RFC3339Nano) {
-      return formatRfc3339Nano(this.epochNs);
+      if (
+        this.loc.name === "UTC" ||
+        (this.loc.fixedOffsetSeconds === 0 && this.loc.name !== "Local")
+      ) {
+        const seconds = this.epochMilliseconds / MILLISECONDS_PER_SECOND;
+        const subSecondMilliseconds = this.epochMilliseconds % MILLISECONDS_PER_SECOND;
+        const normalizedSubSecondMilliseconds =
+          subSecondMilliseconds < 0n
+            ? subSecondMilliseconds + MILLISECONDS_PER_SECOND
+            : subSecondMilliseconds;
+        const epochMs = Number(seconds * 1000n);
+        const d = new Date(epochMs);
+
+        const year = d.getUTCFullYear();
+        const month = d.getUTCMonth() + 1;
+        const day = d.getUTCDate();
+        const hour = d.getUTCHours();
+        const minute = d.getUTCMinutes();
+        const second = d.getUTCSeconds();
+
+        const date = `${year}-${pad2(month)}-${pad2(day)}`;
+        const time = `${pad2(hour)}:${pad2(minute)}:${pad2(second)}`;
+
+        const ms = Number(normalizedSubSecondMilliseconds);
+        if (ms > 0) {
+          return `${date}T${time}.${ms.toString().padStart(3, "0")}Z`;
+        }
+        return `${date}T${time}Z`;
+      }
+
+      const local = getLocalComponents(this.epochMilliseconds, this.loc);
+      const date = `${local.year}-${pad2(local.month)}-${pad2(local.day)}`;
+      const time = `${pad2(local.hour)}:${pad2(local.minute)}:${pad2(local.second)}`;
+
+      const subSecondMilliseconds = this.epochMilliseconds % MILLISECONDS_PER_SECOND;
+      const normalizedSubSecondMilliseconds =
+        subSecondMilliseconds < 0n
+          ? subSecondMilliseconds + MILLISECONDS_PER_SECOND
+          : subSecondMilliseconds;
+      const ms = Number(normalizedSubSecondMilliseconds);
+      let timeStr = time;
+      if (ms > 0) {
+        timeStr += `.${ms.toString().padStart(3, "0")}`;
+      }
+
+      const offset = formatOffsetRfc3339(local.offset);
+      return `${date}T${timeStr}${offset}`;
     }
     if (layout === DateOnly) {
-      return this.toDate().toISOString().slice(0, 10);
+      const local = getLocalComponents(this.epochMilliseconds, this.loc);
+      return `${local.year}-${pad2(local.month)}-${pad2(local.day)}`;
     }
     if (layout === TimeOnly) {
-      return this.toDate().toISOString().slice(11, 19);
+      const local = getLocalComponents(this.epochMilliseconds, this.loc);
+      return `${pad2(local.hour)}:${pad2(local.minute)}:${pad2(local.second)}`;
     }
     if (layout === ANSIC) {
       return `${weekdayShortName(this.weekday())} ${monthShortName(this.month())} ${padSpace(this.day(), 2)} ${pad2(this.hour())}:${pad2(this.minute())}:${pad2(this.second())} ${this.year()}`;
@@ -428,31 +483,26 @@ export class Time {
     if (layout === Stamp) {
       return `${monthShortName(this.month())} ${padSpace(this.day(), 2)} ${pad2(this.hour())}:${pad2(this.minute())}:${pad2(this.second())}`;
     }
-    if (layout === StampMilli || layout === StampMicro || layout === StampNano) {
-      const ns = this.nanosecond().toString().padStart(9, "0");
-      let frac: string;
-      if (layout === StampMilli) {
-        frac = ns.slice(0, 3);
-      } else if (layout === StampMicro) {
-        frac = ns.slice(0, 6);
-      } else {
-        frac = ns;
-      }
+    if (layout === StampMilli) {
+      const frac = this.millisecond().toString().padStart(3, "0");
       return `${monthShortName(this.month())} ${padSpace(this.day(), 2)} ${pad2(this.hour())}:${pad2(this.minute())}:${pad2(this.second())}.${frac}`;
     }
     if (layout === DateTime) {
-      return `${this.toDate().toISOString().slice(0, 10)} ${this.toDate().toISOString().slice(11, 19)}`;
+      const local = getLocalComponents(this.epochMilliseconds, this.loc);
+      const date = `${local.year}-${pad2(local.month)}-${pad2(local.day)}`;
+      const time = `${pad2(local.hour)}:${pad2(local.minute)}:${pad2(local.second)}`;
+      return `${date} ${time}`;
     }
     throw new Error(`layout not implemented yet: ${layout}`);
   }
 
-  /** Returns the time formatted as {@link RFC3339Nano}. */
+  /** Returns the time formatted as {@link RFC3339}. */
   toString(): string {
-    return this.format(RFC3339Nano);
+    return this.format(RFC3339);
   }
 
   private toDate(): Date {
-    return new Date(Number(this.epochNs / NS_PER_MS));
+    return new Date(Number(this.epochMilliseconds));
   }
 }
 
@@ -462,21 +512,21 @@ export class Time {
  * accurately.
  */
 export function now(): Time {
-  const nowMs = Date.now();
-  const monoNs = BigInt(Math.trunc(performance.now() * 1_000_000));
-  return new Time(BigInt(nowMs) * NS_PER_MS, Local, monoNs);
+  const nowMs = BigInt(Date.now());
+  const monotonicMs = BigInt(Math.trunc(performance.now()));
+  return new Time(nowMs, Local, monotonicMs);
 }
 
 /**
  * Returns the local {@link Time} corresponding to the given Unix time, where
- * `sec` is seconds and `nsec` is additional nanoseconds since January 1, 1970
+ * `sec` is seconds and `msec` is additional milliseconds since January 1, 1970
  * UTC.
  *
  * @param sec - Seconds since the Unix epoch.
- * @param nsec - Additional nanoseconds (default `0n`).
+ * @param msec - Additional milliseconds (default `0n`).
  */
-export function unix(sec: bigint, nsec: bigint = 0n): Time {
-  return new Time(sec * NS_PER_S + nsec, Local);
+export function unix(sec: bigint, msec: bigint = 0n): Time {
+  return new Time(sec * MILLISECONDS_PER_SECOND + msec, Local);
 }
 
 /**
@@ -486,17 +536,7 @@ export function unix(sec: bigint, nsec: bigint = 0n): Time {
  * @param ms - Milliseconds since the Unix epoch.
  */
 export function unixMilli(ms: bigint): Time {
-  return new Time(ms * NS_PER_MS, Local);
-}
-
-/**
- * Returns the local {@link Time} corresponding to `us` microseconds since the
- * Unix epoch.
- *
- * @param us - Microseconds since the Unix epoch.
- */
-export function unixMicro(us: bigint): Time {
-  return new Time(us * 1_000n, Local);
+  return new Time(ms, Local);
 }
 
 /**
@@ -509,7 +549,7 @@ export function unixMicro(us: bigint): Time {
  * @param hour - Hour of the day (0–23).
  * @param min - Minute of the hour (0–59).
  * @param sec - Second of the minute (0–59).
- * @param nsec - Nanosecond offset within the second.
+ * @param msec - Millisecond offset within the second.
  * @param loc - Location; defaults to {@link UTC}.
  */
 export function date(
@@ -519,12 +559,30 @@ export function date(
   hour: number,
   min: number,
   sec: number,
-  nsec: number,
+  msec: number,
   loc: Location = UTC
 ): Time {
-  const ms = Date.UTC(year, month - 1, day, hour, min, sec, Math.floor(nsec / 1_000_000));
-  const extraNs = BigInt(nsec % 1_000_000);
-  return new Time(BigInt(ms) * NS_PER_MS + extraNs, loc);
+  if (loc.fixedOffsetSeconds !== undefined) {
+    const utcMs =
+      Date.UTC(year, month - 1, day, hour, min, sec, msec) - loc.fixedOffsetSeconds * 1_000;
+    return new Time(BigInt(utcMs), loc);
+  }
+
+  if (loc.name === "UTC") {
+    const ms = Date.UTC(year, month - 1, day, hour, min, sec, msec);
+    return new Time(BigInt(ms), loc);
+  }
+
+  if (loc.name === "Local") {
+    const localMs = new Date(year, month - 1, day, hour, min, sec, msec).getTime();
+    return new Time(BigInt(localMs), loc);
+  }
+
+  const guessUtc = Date.UTC(year, month - 1, day, hour, min, sec, msec);
+  const guessedDate = new Date(guessUtc);
+  const offset = getOffsetSecondsForZone(guessedDate, loc.name);
+  const utcMs = guessUtc - offset * 1_000;
+  return new Time(BigInt(utcMs), loc);
 }
 
 /**
@@ -564,16 +622,7 @@ export function parse(layout: string, value: string): Time {
     if (Number.isNaN(ms)) {
       throw new TypeError(`cannot parse time: ${value}`);
     }
-    return new Time(BigInt(ms) * NS_PER_MS, UTC);
-  }
-
-  if (layout === RFC3339Nano) {
-    const parsed = parseRfc3339Nano(value);
-    if (parsed === null) {
-      throw new TypeError(`cannot parse time: ${value}`);
-    }
-
-    return new Time(parsed, UTC);
+    return new Time(BigInt(ms), UTC);
   }
 
   if (layout === DateOnly) {
@@ -581,7 +630,7 @@ export function parse(layout: string, value: string): Time {
     if (Number.isNaN(ms)) {
       throw new TypeError(`cannot parse time: ${value}`);
     }
-    return new Time(BigInt(ms) * NS_PER_MS, UTC);
+    return new Time(BigInt(ms), UTC);
   }
 
   if (layout === DateTime) {
@@ -589,7 +638,7 @@ export function parse(layout: string, value: string): Time {
     if (Number.isNaN(ms)) {
       throw new TypeError(`cannot parse time: ${value}`);
     }
-    return new Time(BigInt(ms) * NS_PER_MS, UTC);
+    return new Time(BigInt(ms), UTC);
   }
 
   if (layout === ANSIC) {
@@ -613,7 +662,7 @@ export function parse(layout: string, value: string): Time {
       Number(m[6]),
       0
     );
-    return new Time(BigInt(ms) * NS_PER_MS, UTC);
+    return new Time(BigInt(ms), UTC);
   }
 
   if (
@@ -629,7 +678,7 @@ export function parse(layout: string, value: string): Time {
     if (Number.isNaN(ms)) {
       throw new TypeError(`cannot parse time: ${value}`);
     }
-    return new Time(BigInt(ms) * NS_PER_MS, UTC);
+    return new Time(BigInt(ms), UTC);
   }
 
   if (layout === TimeOnly) {
@@ -639,7 +688,7 @@ export function parse(layout: string, value: string): Time {
     }
 
     const ms = Date.UTC(0, 0, 1, Number(m[1]), Number(m[2]), Number(m[3]), 0);
-    return new Time(BigInt(ms) * NS_PER_MS, UTC);
+    return new Time(BigInt(ms), UTC);
   }
 
   if (layout === Kitchen) {
@@ -652,19 +701,15 @@ export function parse(layout: string, value: string): Time {
     const hour = m[3] === "PM" ? hourBase + 12 : hourBase;
     const minute = Number(m[2]);
     const ms = Date.UTC(0, 0, 1, hour, minute, 0, 0);
-    return new Time(BigInt(ms) * NS_PER_MS, UTC);
+    return new Time(BigInt(ms), UTC);
   }
 
-  if (layout === Stamp || layout === StampMilli || layout === StampMicro || layout === StampNano) {
+  if (layout === Stamp || layout === StampMilli) {
     let base: RegExp;
     if (layout === Stamp) {
       base = /^(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})$/;
-    } else if (layout === StampMilli) {
-      base = /^(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})$/;
-    } else if (layout === StampMicro) {
-      base = /^(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{6})$/;
     } else {
-      base = /^(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{9})$/;
+      base = /^(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\.(\d{3})$/;
     }
 
     const m = base.exec(value);
@@ -683,11 +728,8 @@ export function parse(layout: string, value: string): Time {
     const hour = Number(m[3]);
     const minute = Number(m[4]);
     const second = Number(m[5]);
-    const fracRaw = m[6] ?? "";
-    const nanos = fracRaw.length > 0 ? Number(fracRaw.padEnd(9, "0")) : 0;
-    const ms = Date.UTC(0, month - 1, day, hour, minute, second, Math.floor(nanos / 1_000_000));
-    const extraNs = BigInt(nanos % 1_000_000);
-    return new Time(BigInt(ms) * NS_PER_MS + extraNs, UTC);
+    const ms = Date.UTC(0, month - 1, day, hour, minute, second, Number(m[6] ?? "0"));
+    return new Time(BigInt(ms), UTC);
   }
 
   throw new Error(`layout not implemented yet: ${layout}`);
@@ -695,8 +737,8 @@ export function parse(layout: string, value: string): Time {
 
 /**
  * Like {@link parse}, but interprets the result in the given location rather
- * than UTC. For layouts that already encode timezone information ({@link RFC3339},
- * {@link RFC3339Nano}), the explicit offset wins and the location is applied
+ * than UTC. For layouts that already encode timezone information ({@link RFC3339}),
+ * the explicit offset wins and the location is applied
  * afterward.
  *
  * @param layout - A layout constant.
@@ -706,7 +748,7 @@ export function parse(layout: string, value: string): Time {
  * @throws {Error} If the value cannot be parsed with the given layout.
  */
 export function parseInLocation(layout: string, value: string, loc: Location): Time {
-  if (layout === RFC3339 || layout === RFC3339Nano) {
+  if (layout === RFC3339) {
     return parse(layout, value).in(loc);
   }
 
@@ -761,7 +803,7 @@ export function parseInLocation(layout: string, value: string, loc: Location): T
 }
 
 export function sleep(d: Duration): Promise<void> {
-  const ms = Number(d.nanoseconds() / NS_PER_MS);
+  const ms = Number(d.milliseconds());
   if (ms <= 0) {
     return Promise.resolve();
   }
@@ -780,24 +822,24 @@ function fromLocationClock(
   if (loc.fixedOffsetSeconds !== undefined) {
     const utcMs =
       Date.UTC(year, month - 1, day, hour, minute, second, 0) - loc.fixedOffsetSeconds * 1_000;
-    return new Time(BigInt(utcMs) * NS_PER_MS, loc);
+    return new Time(BigInt(utcMs), loc);
   }
 
   if (loc.name === "UTC") {
     const utcMs = Date.UTC(year, month - 1, day, hour, minute, second, 0);
-    return new Time(BigInt(utcMs) * NS_PER_MS, loc);
+    return new Time(BigInt(utcMs), loc);
   }
 
   if (loc.name === "Local") {
     const localMs = new Date(year, month - 1, day, hour, minute, second, 0).getTime();
-    return new Time(BigInt(localMs) * NS_PER_MS, loc);
+    return new Time(BigInt(localMs), loc);
   }
 
   const guessUtc = Date.UTC(year, month - 1, day, hour, minute, second, 0);
   const guessedDate = new Date(guessUtc);
   const offset = getOffsetSecondsForZone(guessedDate, loc.name);
   const utcMs = guessUtc - offset * 1_000;
-  return new Time(BigInt(utcMs) * NS_PER_MS, loc);
+  return new Time(BigInt(utcMs), loc);
 }
 
 function getOffsetSecondsForZone(date: Date, timeZone: string): number {
@@ -903,52 +945,85 @@ function zoneToken(name: string, offsetSeconds: number): string {
   return formatOffset(offsetSeconds);
 }
 
-function formatRfc3339Nano(epochNs: bigint): string {
-  const seconds = epochNs / NS_PER_S;
-  const nsRemainder = epochNs % NS_PER_S;
-  const normalizedNs = nsRemainder < 0n ? nsRemainder + NS_PER_S : nsRemainder;
-  const epochMs = Number(seconds * 1000n);
-  const d = new Date(epochMs);
-  const base = d.toISOString().slice(0, 19);
-
-  if (normalizedNs === 0n) {
-    return `${base}Z`;
-  }
-
-  const frac = normalizedNs.toString().padStart(9, "0").replace(/0+$/, "");
-  return `${base}.${frac}Z`;
+function formatOffsetRfc3339(offsetSeconds: number): string {
+  const sign = offsetSeconds < 0 ? "-" : "+";
+  const abs = Math.abs(offsetSeconds);
+  const hh = Math.floor(abs / 3600);
+  const mm = Math.floor((abs % 3600) / 60);
+  return `${sign}${hh.toString().padStart(2, "0")}:${mm.toString().padStart(2, "0")}`;
 }
 
-function parseRfc3339Nano(value: string): bigint | null {
-  const m =
-    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/.exec(
-      value
-    );
-  if (!m) {
-    return null;
-  }
-
-  const year = Number(m[1]);
-  const month = Number(m[2]);
-  const day = Number(m[3]);
-  const hour = Number(m[4]);
-  const minute = Number(m[5]);
-  const second = Number(m[6]);
-  const frac = m[7] ?? "";
-  const zone = m[8]!;
-
-  const nanos = frac.length > 0 ? BigInt(frac.padEnd(9, "0")) : 0n;
-  const utcMs = Date.UTC(year, month - 1, day, hour, minute, second, 0);
-
-  let offsetSeconds = 0;
-  if (zone !== "Z") {
-    const sign = zone.startsWith("-") ? -1 : 1;
-    const zh = Number(zone.slice(1, 3));
-    const zm = Number(zone.slice(4, 6));
-    offsetSeconds = sign * ((zh * 60 + zm) * 60);
-  }
-
-  return BigInt(utcMs) * NS_PER_MS + nanos - BigInt(offsetSeconds) * NS_PER_S;
+interface LocalComponents {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  offset: number;
 }
 
-export { Nanosecond, parseDuration } from "./duration.js";
+function getLocalComponents(epochMilliseconds: bigint, loc: Location): LocalComponents {
+  const utcDate = new Date(Number(epochMilliseconds));
+
+  if (loc.fixedOffsetSeconds !== undefined) {
+    const offsetMs = loc.fixedOffsetSeconds * 1_000;
+    const localMs = utcDate.getTime() + offsetMs;
+    const localDate = new Date(localMs);
+
+    return {
+      year: localDate.getUTCFullYear(),
+      month: localDate.getUTCMonth() + 1,
+      day: localDate.getUTCDate(),
+      hour: localDate.getUTCHours(),
+      minute: localDate.getUTCMinutes(),
+      second: localDate.getUTCSeconds(),
+      offset: loc.fixedOffsetSeconds
+    };
+  }
+
+  if (loc.name === "UTC") {
+    return {
+      year: utcDate.getUTCFullYear(),
+      month: utcDate.getUTCMonth() + 1,
+      day: utcDate.getUTCDate(),
+      hour: utcDate.getUTCHours(),
+      minute: utcDate.getUTCMinutes(),
+      second: utcDate.getUTCSeconds(),
+      offset: 0
+    };
+  }
+
+  if (loc.name === "Local") {
+    return {
+      year: utcDate.getFullYear(),
+      month: utcDate.getMonth() + 1,
+      day: utcDate.getDate(),
+      hour: utcDate.getHours(),
+      minute: utcDate.getMinutes(),
+      second: utcDate.getSeconds(),
+      offset: -utcDate.getTimezoneOffset() * 60
+    };
+  }
+
+  const offset = getOffsetSecondsForZone(utcDate, loc.name);
+  const offsetMs = offset * 1_000;
+  const localMs = utcDate.getTime() + offsetMs;
+  const localDate = new Date(localMs);
+
+  return {
+    year: localDate.getUTCFullYear(),
+    month: localDate.getUTCMonth() + 1,
+    day: localDate.getUTCDate(),
+    hour: localDate.getUTCHours(),
+    minute: localDate.getUTCMinutes(),
+    second: localDate.getUTCSeconds(),
+    offset
+  };
+}
+
+function normalizeEpochMilliseconds(epochMilliseconds: bigint): bigint {
+  return epochMilliseconds;
+}
+
+export { parseDuration } from "./duration.js";

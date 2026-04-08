@@ -9,10 +9,12 @@ Go-inspired time utilities for Node.js with TypeScript types and zero runtime de
 
 `go-time` brings familiar Go `time` concepts to JavaScript and TypeScript: durations, layouts, parsing/formatting, locations, timers, and tickers.
 
+Precision note: `go-time` is built on JavaScript `Date`, so wall-clock time values are limited to millisecond precision.
+
 ## Features
 
 - Go-style duration values and parser (`2h45m10.5s`)
-- `Time` API for arithmetic, comparisons, rounding, truncation, and calendar fields
+- `Time` API for millisecond-precision arithmetic, comparisons, rounding, truncation, and calendar fields
 - Monotonic clock support for stable elapsed-time measurement with `now()`, `sub()`, `since()`, and `until()`
 - Layout-based parse/format helpers (`RFC3339`, `DateTime`, `Kitchen`, and more)
 - Time zone support with UTC, local, fixed offsets, and IANA zone names
@@ -36,7 +38,7 @@ npm install go-time
 import {
   DateTime,
   Month,
-  RFC3339Nano,
+  RFC3339,
   date,
   now,
   parse,
@@ -54,8 +56,8 @@ await sleep(timeout);
 const elapsed = since(started);
 console.log(elapsed.toString()); // e.g. "252.3ms"
 
-const t1 = parse(RFC3339Nano, "2026-04-08T09:10:11.123456789Z");
-console.log(t1.nanosecond()); // 123456789
+const t1 = parse(RFC3339, "2026-04-08T09:10:11.123Z");
+console.log(t1.millisecond()); // 123
 
 const t2 = date(2026, Month.April, 8, 12, 30, 0, 0);
 console.log(t2.format(DateTime)); // "2026-04-08 12:30:00"
@@ -75,28 +77,21 @@ const a = parseDuration("2h45m10.5s");
 const b = new Duration(90n * Second);
 const c = new Duration(1n * Hour + 30n * Minute);
 
-console.log(a.nanoseconds()); // 9910500000000n
+console.log(a.milliseconds()); // 9910500n
 console.log(b.round(new Duration(1n * Second)).toString()); // "1m30s"
 console.log(c.truncate(new Duration(1n * Minute)).toString()); // "1h30m0s"
 ```
 
-Supported units: `ns`, `us`/`µs`, `ms`, `s`, `m`, `h`.
+Supported units: `ms`, `s`, `m`, `h`.
 
 ### Time and Layouts
 
-```ts
-import {
-  DateOnly,
-  DateTime,
-  Kitchen,
-  RFC3339,
-  RFC3339Nano,
-  parse,
-  parseInLocation,
-  fixedZone
-} from "go-time";
+`Time` uses JavaScript `Date` under the hood, so parsing, formatting, constructors, and current-time reads only support millisecond precision.
 
-const t = parse(RFC3339Nano, "2026-04-08T09:10:11.123456789Z");
+```ts
+import { DateOnly, DateTime, Kitchen, RFC3339, parse, parseInLocation, fixedZone } from "go-time";
+
+const t = parse(RFC3339, "2026-04-08T09:10:11.123Z");
 
 console.log(t.format(DateOnly)); // "2026-04-08"
 console.log(t.format(DateTime)); // "2026-04-08 09:10:11"
@@ -112,7 +107,7 @@ console.log(localClock.zone()); // ["PLUS2", 7200]
 
 `now()` records both wall-clock time and a monotonic reading. When two `Time` values both carry monotonic data, `sub()`, `since()`, and `until()` use the monotonic clock for elapsed-time calculations instead of wall-clock time.
 
-This makes elapsed-time measurement stable across wall-clock adjustments. Times created with `unix()`, `unixMilli()`, `unixMicro()`, `date()`, or `parse()` do not include monotonic data.
+This makes elapsed-time measurement stable across wall-clock adjustments. Times created with `unix()`, `unixMilli()`, `date()`, or `parse()` do not include monotonic data.
 
 ```ts
 import { now, parseDuration, since, sleep, unix } from "go-time";
@@ -157,12 +152,12 @@ import { newTicker, newTimer, parseDuration } from "go-time";
 
 const timer = newTimer(parseDuration("50ms"));
 const firedAt = await timer.C.recv();
-console.log(firedAt.unixNano()); // e.g. 1775649011123456789n
+console.log(firedAt.unixMilli()); // e.g. 1775649011123n
 
 const ticker = newTicker(parseDuration("100ms"));
 let count = 0;
 for await (const tick of ticker.C) {
-  console.log(tick.unixNano()); // e.g. 1775649011223456789n
+  console.log(tick.unixMilli()); // e.g. 1775649011223n
   count += 1;
   if (count === 3) {
     ticker.stop();

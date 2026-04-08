@@ -33,18 +33,12 @@ export const RFC1123 = "Mon, 02 Jan 2006 15:04:05 MST";
 export const RFC1123Z = "Mon, 02 Jan 2006 15:04:05 -0700";
 /** RFC 3339 / ISO 8601: `"2006-01-02T15:04:05Z07:00"`. */
 export const RFC3339 = "2006-01-02T15:04:05Z07:00";
-/** RFC 3339 with nanosecond precision: `"2006-01-02T15:04:05.999999999Z07:00"`. */
-export const RFC3339Nano = "2006-01-02T15:04:05.999999999Z07:00";
 /** 12-hour clock format: `"3:04PM"`. */
 export const Kitchen = "3:04PM";
 /** Abbreviated month, day, and time: `"Jan _2 15:04:05"`. */
 export const Stamp = "Jan _2 15:04:05";
 /** {@link Stamp} with millisecond precision: `"Jan _2 15:04:05.000"`. */
 export const StampMilli = "Jan _2 15:04:05.000";
-/** {@link Stamp} with microsecond precision: `"Jan _2 15:04:05.000000"`. */
-export const StampMicro = "Jan _2 15:04:05.000000";
-/** {@link Stamp} with nanosecond precision: `"Jan _2 15:04:05.000000000"`. */
-export const StampNano = "Jan _2 15:04:05.000000000";
 /** Date and time without timezone: `"2006-01-02 15:04:05"`. */
 export const DateTime = "2006-01-02 15:04:05";
 /** Date only: `"2006-01-02"`. */

@@ -1,21 +1,15 @@
-const NS_PER_US = 1_000n;
-const NS_PER_MS = 1_000_000n;
-const NS_PER_S = 1_000_000_000n;
-const NS_PER_M = 60n * NS_PER_S;
-const NS_PER_H = 60n * NS_PER_M;
+const MILLISECONDS_PER_SECOND = 1_000n;
+const MILLISECONDS_PER_MINUTE = 60n * MILLISECONDS_PER_SECOND;
+const MILLISECONDS_PER_HOUR = 60n * MILLISECONDS_PER_MINUTE;
 
-/** One nanosecond, the base unit of {@link Duration}. */
-export const Nanosecond = 1n;
-/** One microsecond (1,000 nanoseconds). */
-export const Microsecond = NS_PER_US;
-/** One millisecond (1,000,000 nanoseconds). */
-export const Millisecond = NS_PER_MS;
-/** One second (1,000,000,000 nanoseconds). */
-export const Second = NS_PER_S;
+/** One millisecond, the base unit of {@link Duration}. */
+export const Millisecond = 1n;
+/** One second (1,000 milliseconds). */
+export const Second = MILLISECONDS_PER_SECOND;
 /** One minute (60 seconds). */
-export const Minute = NS_PER_M;
+export const Minute = MILLISECONDS_PER_MINUTE;
 /** One hour (60 minutes). */
-export const Hour = NS_PER_H;
+export const Hour = MILLISECONDS_PER_HOUR;
 
 type DurationUnit = {
   suffix: string;
@@ -26,15 +20,12 @@ const UNIT_TABLE: DurationUnit[] = [
   { suffix: "h", factor: Hour },
   { suffix: "m", factor: Minute },
   { suffix: "s", factor: Second },
-  { suffix: "ms", factor: Millisecond },
-  { suffix: "us", factor: Microsecond },
-  { suffix: "µs", factor: Microsecond },
-  { suffix: "ns", factor: Nanosecond }
+  { suffix: "ms", factor: Millisecond }
 ];
 
 /**
- * A span of time with nanosecond precision, represented internally as a
- * signed `bigint` number of nanoseconds.
+ * A span of time with millisecond precision, represented internally as a
+ * signed `bigint` number of milliseconds.
  *
  * @example
  * ```ts
@@ -44,49 +35,39 @@ const UNIT_TABLE: DurationUnit[] = [
  * ```
  */
 export class Duration {
-  private readonly ns: bigint;
+  private readonly ms: bigint;
 
   /**
-   * @param nanoseconds - The duration in nanoseconds. Use the exported unit
+   * @param milliseconds - The duration in milliseconds. Use the exported unit
    *   constants (`Second`, `Minute`, etc.) to construct common values.
    */
-  constructor(nanoseconds: bigint) {
-    this.ns = nanoseconds;
-  }
-
-  /** Returns the duration as a whole number of nanoseconds. */
-  nanoseconds(): bigint {
-    return this.ns;
-  }
-
-  /** Returns the duration truncated to whole microseconds. */
-  microseconds(): bigint {
-    return this.ns / NS_PER_US;
+  constructor(milliseconds: bigint) {
+    this.ms = milliseconds;
   }
 
   /** Returns the duration truncated to whole milliseconds. */
   milliseconds(): bigint {
-    return this.ns / NS_PER_MS;
+    return this.ms;
   }
 
   /** Returns the duration as a floating-point number of seconds. */
   seconds(): number {
-    return Number(this.ns) / Number(NS_PER_S);
+    return Number(this.ms) / Number(MILLISECONDS_PER_SECOND);
   }
 
   /** Returns the duration as a floating-point number of minutes. */
   minutes(): number {
-    return Number(this.ns) / Number(NS_PER_M);
+    return Number(this.ms) / Number(MILLISECONDS_PER_MINUTE);
   }
 
   /** Returns the duration as a floating-point number of hours. */
   hours(): number {
-    return Number(this.ns) / Number(NS_PER_H);
+    return Number(this.ms) / Number(MILLISECONDS_PER_HOUR);
   }
 
   /** Returns the absolute value of the duration. */
   abs(): Duration {
-    return this.ns < 0n ? new Duration(-this.ns) : this;
+    return this.ms < 0n ? new Duration(-this.ms) : this;
   }
 
   /**
@@ -97,12 +78,12 @@ export class Duration {
    * @param m - The rounding unit.
    */
   round(m: Duration): Duration {
-    const mod = m.nanoseconds();
+    const mod = m.milliseconds();
     if (mod <= 0n) {
       return this;
     }
 
-    const n = this.ns;
+    const n = this.ms;
     const rem = n % mod;
     if (rem === 0n) {
       return this;
@@ -126,11 +107,11 @@ export class Duration {
    * @param m - The truncation unit.
    */
   truncate(m: Duration): Duration {
-    const mod = m.nanoseconds();
+    const mod = m.milliseconds();
     if (mod <= 0n) {
       return this;
     }
-    return new Duration(this.ns - (this.ns % mod));
+    return new Duration(this.ms - (this.ms % mod));
   }
 
   /**
@@ -138,21 +119,15 @@ export class Duration {
    * combination of units necessary, e.g. `"1h30m5s"`, `"200ms"`, `"0s"`.
    */
   toString(): string {
-    if (this.ns === 0n) {
+    if (this.ms === 0n) {
       return "0s";
     }
 
-    const sign = this.ns < 0n ? "-" : "";
-    let rem = this.ns < 0n ? -this.ns : this.ns;
+    const sign = this.ms < 0n ? "-" : "";
+    let rem = this.ms < 0n ? -this.ms : this.ms;
 
     if (rem < Second) {
-      if (rem >= Millisecond) {
-        return sign + formatSubsecond(rem, Millisecond, "ms");
-      }
-      if (rem >= Microsecond) {
-        return sign + formatSubsecond(rem, Microsecond, "us");
-      }
-      return sign + `${rem}ns`;
+      return sign + `${rem}ms`;
     }
 
     const hours = rem / Hour;
@@ -160,7 +135,7 @@ export class Duration {
     const minutes = rem / Minute;
     rem %= Minute;
     const seconds = rem / Second;
-    const nanos = rem % Second;
+    const milliseconds = rem % Second;
 
     let out = sign;
     if (hours > 0n) {
@@ -170,28 +145,15 @@ export class Duration {
       out += `${minutes}m`;
     }
 
-    if (nanos === 0n) {
+    if (milliseconds === 0n) {
       out += `${seconds}s`;
       return out;
     }
 
-    const frac = nanos.toString().padStart(9, "0").replace(/0+$/, "");
+    const frac = milliseconds.toString().padStart(3, "0").replace(/0+$/, "");
     out += `${seconds}.${frac}s`;
     return out;
   }
-}
-
-function formatSubsecond(value: bigint, unit: bigint, suffix: string): string {
-  const whole = value / unit;
-  const rem = value % unit;
-
-  if (rem === 0n) {
-    return `${whole}${suffix}`;
-  }
-
-  const digits = unit === Millisecond ? 6 : 3;
-  const frac = rem.toString().padStart(digits, "0").replace(/0+$/, "");
-  return `${whole}.${frac}${suffix}`;
 }
 
 /**
@@ -199,7 +161,7 @@ function formatSubsecond(value: bigint, unit: bigint, suffix: string): string {
  *
  * A duration string is a possibly-signed sequence of decimal numbers, each
  * with an optional fraction and a unit suffix: `"300ms"`, `"1.5h"`, `"-2h45m"`.
- * Valid units are `"ns"`, `"us"` (or `"µs"`), `"ms"`, `"s"`, `"m"`, and `"h"`.
+ * Valid units are `"ms"`, `"s"`, `"m"`, and `"h"`.
  *
  * @param input - The string to parse.
  * @returns The parsed {@link Duration}.
@@ -272,13 +234,13 @@ export function parseDuration(input: string): Duration {
     }
 
     const whole = number.length > 0 ? BigInt(number) : 0n;
-    let ns = whole * entry.factor;
+    let ms = whole * entry.factor;
     if (fraction.length > 0) {
       const scale = 10n ** BigInt(fraction.length);
-      ns += (BigInt(fraction) * entry.factor) / scale;
+      ms += (BigInt(fraction) * entry.factor) / scale;
     }
 
-    total += ns;
+    total += ms;
   }
 
   return new Duration(total * sign);

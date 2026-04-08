@@ -1,8 +1,6 @@
 import { Duration } from "./duration.js";
 import { Time, now } from "./time.js";
 
-const NS_PER_MS = 1_000_000n;
-
 /**
  * A buffered async channel that delivers {@link Time} values to consumers.
  *
@@ -128,7 +126,7 @@ export class Timer {
   }
 
   private schedule(d: Duration): NodeJS.Timeout {
-    const ms = Number(d.nanoseconds() / NS_PER_MS);
+    const ms = Number(d.milliseconds());
     const delay = Math.max(0, ms);
     return setTimeout(() => {
       this.fired = true;
@@ -167,7 +165,7 @@ export class Ticker {
    */
   constructor(d: Duration) {
     this.C = new TimeChannel(1);
-    const ms = Number(d.nanoseconds() / NS_PER_MS);
+    const ms = Number(d.milliseconds());
     if (ms <= 0) {
       throw new Error("non-positive interval for new ticker");
     }
@@ -194,7 +192,7 @@ export class Ticker {
    */
   reset(d: Duration): void {
     this.stop();
-    const ms = Number(d.nanoseconds() / NS_PER_MS);
+    const ms = Number(d.milliseconds());
     if (ms <= 0) {
       throw new Error("non-positive interval for ticker reset");
     }
@@ -248,7 +246,7 @@ export function newTicker(d: Duration): Ticker {
 }
 
 export function tick(d: Duration): AsyncIterable<Time> | null {
-  if (d.nanoseconds() <= 0n) {
+  if (d.milliseconds() <= 0n) {
     return null;
   }
 

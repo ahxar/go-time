@@ -1,13 +1,4 @@
-export {
-  Duration,
-  Hour,
-  Microsecond,
-  Millisecond,
-  Minute,
-  Nanosecond,
-  Second,
-  parseDuration
-} from "./duration.js";
+export { Duration, Hour, Millisecond, Minute, Second, parseDuration } from "./duration.js";
 
 export {
   ANSIC,
@@ -16,7 +7,6 @@ export {
   Kitchen,
   Layout,
   RFC3339,
-  RFC3339Nano,
   RFC822,
   RFC822Z,
   RFC850,
@@ -24,9 +14,7 @@ export {
   RFC1123Z,
   RubyDate,
   Stamp,
-  StampMicro,
   StampMilli,
-  StampNano,
   TimeOnly,
   UnixDate
 } from "./layout.js";
@@ -51,7 +39,6 @@ export {
   since,
   sleep,
   unix,
-  unixMicro,
   unixMilli,
   until
 } from "./time.js";
