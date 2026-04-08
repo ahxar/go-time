@@ -83,22 +83,22 @@ test("monotonic subtraction prefers monotonic milliseconds over wall clock", () 
 
 test("location transforms and zone reporting are behaviorally correct", () => {
   const utcTime = unix(0n, 0n).utc();
-  assert.deepEqual(utcTime.zone(), ["UTC", 0]);
+  assert.deepEqual(utcTime.zone(), { name: "UTC", offsetSeconds: 0 });
 
   const fixed = unix(0n, 0n).in(plus2);
-  assert.deepEqual(fixed.zone(), ["PLUS2", 7200]);
+  assert.deepEqual(fixed.zone(), { name: "PLUS2", offsetSeconds: 7200 });
   assert.equal(fixed.location().toString(), "PLUS2");
 
   const local = unix(0n, 0n).local();
-  const [name, offset] = local.zone();
+  const { name, offsetSeconds } = local.zone();
   assert.equal(name, "Local");
-  assert.equal(Number.isInteger(offset), true);
+  assert.equal(Number.isInteger(offsetSeconds), true);
 });
 
 test("calendar accessors expose expected fields", () => {
   const t = date(2026, Month.April, 8, 12, 30, 15, 123).utc();
-  assert.deepEqual(t.date(), [2026, Month.April, 8]);
-  assert.deepEqual(t.clock(), [12, 30, 15]);
+  assert.deepEqual(t.date(), { year: 2026, month: Month.April, day: 8 });
+  assert.deepEqual(t.clock(), { hour: 12, minute: 30, second: 15 });
   assert.equal(t.year(), 2026);
   assert.equal(t.month(), Month.April);
   assert.equal(t.day(), 8);
@@ -108,7 +108,7 @@ test("calendar accessors expose expected fields", () => {
   assert.equal(t.millisecond(), 123);
   assert.equal(t.weekday(), 3);
   assert.equal(t.yearDay(), 98);
-  assert.deepEqual(date(2021, Month.January, 1, 0, 0, 0, 0).isoWeek(), [2020, 53]);
+  assert.deepEqual(date(2021, Month.January, 1, 0, 0, 0, 0).isoWeek(), { year: 2020, week: 53 });
 });
 
 test("round and truncate follow step semantics", () => {
@@ -125,16 +125,16 @@ test("round and truncate follow step semantics", () => {
 
 test("zone behavior includes UTC-like and named IANA locations", () => {
   const pseudoUtc = unix(0n, 0n).in(new Location("UTC"));
-  assert.deepEqual(pseudoUtc.zone(), ["UTC", 0]);
+  assert.deepEqual(pseudoUtc.zone(), { name: "UTC", offsetSeconds: 0 });
 
   const etcUtc = unix(0n, 0n).in(new Location("Etc/UTC"));
-  assert.deepEqual(etcUtc.zone(), ["Etc/UTC", 0]);
+  assert.deepEqual(etcUtc.zone(), { name: "Etc/UTC", offsetSeconds: 0 });
 
   const paris = loadLocation("Europe/Paris");
   const parisTime = unix(0n, 0n).in(paris);
-  const [name, offset] = parisTime.zone();
+  const { name, offsetSeconds } = parisTime.zone();
   assert.equal(name, "Europe/Paris");
-  assert.equal(Number.isInteger(offset), true);
+  assert.equal(Number.isInteger(offsetSeconds), true);
 
   const pst = unix(0n, 0n).in(fixedZone("PST", -8 * 3600));
   assert.match(pst.format(RFC1123), /PST$/);
@@ -210,32 +210,32 @@ test("format and parse roundtrip for supported layouts", () => {
 test("parseInLocation uses provided location for wall-clock parsing", () => {
   const dt = parseInLocation(DateTime, "2026-04-08 12:00:00", plus2);
   assert.equal(dt.unix(), 1775642400n);
-  assert.deepEqual(dt.zone(), ["PLUS2", 7200]);
+  assert.deepEqual(dt.zone(), { name: "PLUS2", offsetSeconds: 7200 });
 
   const d = parseInLocation(DateOnly, "2026-04-08", plus2);
   assert.equal(d.format(DateTime), "2026-04-08 00:00:00");
   assert.equal(d.utc().format(DateTime), "2026-04-07 22:00:00");
 
   const t = parseInLocation(TimeOnly, "03:04:05", plus2);
-  assert.deepEqual(t.zone(), ["PLUS2", 7200]);
+  assert.deepEqual(t.zone(), { name: "PLUS2", offsetSeconds: 7200 });
 
   const kitchen = parseInLocation(Kitchen, "3:04PM", plus2);
-  assert.deepEqual(kitchen.zone(), ["PLUS2", 7200]);
+  assert.deepEqual(kitchen.zone(), { name: "PLUS2", offsetSeconds: 7200 });
 
   const rfc = parseInLocation(RFC3339, "2026-04-08T12:00:00.000Z", plus2);
-  assert.deepEqual(rfc.zone(), ["PLUS2", 7200]);
+  assert.deepEqual(rfc.zone(), { name: "PLUS2", offsetSeconds: 7200 });
 
   const dtUtc = parseInLocation(DateTime, "2026-04-08 12:00:00", loadLocation("UTC"));
-  assert.deepEqual(dtUtc.zone(), ["UTC", 0]);
+  assert.deepEqual(dtUtc.zone(), { name: "UTC", offsetSeconds: 0 });
 
   const dtPseudoUtc = parseInLocation(DateTime, "2026-04-08 12:00:00", new Location("UTC"));
-  assert.deepEqual(dtPseudoUtc.zone(), ["UTC", 0]);
+  assert.deepEqual(dtPseudoUtc.zone(), { name: "UTC", offsetSeconds: 0 });
 
   const dtLocal = parseInLocation(DateTime, "2026-04-08 12:00:00", loadLocation("Local"));
-  assert.equal(dtLocal.zone()[0], "Local");
+  assert.equal(dtLocal.zone().name, "Local");
 
   const dtParis = parseInLocation(DateTime, "2026-04-08 12:00:00", loadLocation("Europe/Paris"));
-  assert.equal(dtParis.zone()[0], "Europe/Paris");
+  assert.equal(dtParis.zone().name, "Europe/Paris");
 });
 
 test("zone offset parsing falls back safely when Intl parts are missing or unparsable", () => {
@@ -256,11 +256,17 @@ test("zone offset parsing falls back safely when Intl parts are missing or unpar
   try {
     (Intl as unknown as { DateTimeFormat: typeof Intl.DateTimeFormat }).DateTimeFormat =
       MissingZoneNameFormatter as unknown as typeof Intl.DateTimeFormat;
-    assert.deepEqual(unix(0n, 0n).in(new Location("Etc/Test")).zone(), ["Etc/Test", 0]);
+    assert.deepEqual(unix(0n, 0n).in(new Location("Etc/Test")).zone(), {
+      name: "Etc/Test",
+      offsetSeconds: 0
+    });
 
     (Intl as unknown as { DateTimeFormat: typeof Intl.DateTimeFormat }).DateTimeFormat =
       UnparsableZoneNameFormatter as unknown as typeof Intl.DateTimeFormat;
-    assert.deepEqual(unix(0n, 0n).in(new Location("Etc/Test")).zone(), ["Etc/Test", 0]);
+    assert.deepEqual(unix(0n, 0n).in(new Location("Etc/Test")).zone(), {
+      name: "Etc/Test",
+      offsetSeconds: 0
+    });
   } finally {
     (Intl as unknown as { DateTimeFormat: typeof Intl.DateTimeFormat }).DateTimeFormat = original;
   }
@@ -341,8 +347,8 @@ test("calendar accessors reflect the time's location", () => {
   assert.equal(t.day(), 8);
   assert.equal(t.month(), Month.April);
   assert.equal(t.year(), 2026);
-  assert.deepEqual(t.clock(), [23, 30, 15]);
-  assert.deepEqual(t.date(), [2026, Month.April, 8]);
+  assert.deepEqual(t.clock(), { hour: 23, minute: 30, second: 15 });
+  assert.deepEqual(t.date(), { year: 2026, month: Month.April, day: 8 });
 
   // Cross-midnight: 2026-04-09 01:30:00 UTC+2 = 2026-04-08 23:30:00 UTC
   const early = date(2026, Month.April, 9, 1, 30, 0, 0, plus2);

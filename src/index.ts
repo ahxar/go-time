@@ -23,10 +23,14 @@ export type { SupportedLayout } from "./layout.js";
 export { Local, Location, UTC, fixedZone, loadLocation } from "./location.js";
 
 export {
+  type ClockInfo,
   type DateFields,
+  type DateInfo,
+  type IsoWeekInfo,
   Month,
   Time,
   Weekday,
+  type ZoneInfo,
   date,
   now,
   parse,

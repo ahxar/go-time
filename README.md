@@ -100,7 +100,7 @@ console.log(t.format(RFC3339)); // "2026-04-08T09:10:11.123Z"
 
 const plus2 = fixedZone("PLUS2", 2 * 3600);
 const localClock = parseInLocation(DateTime, "2026-04-08 12:00:00", plus2);
-console.log(localClock.zone()); // ["PLUS2", 7200]
+console.log(localClock.zone()); // { name: "PLUS2", offsetSeconds: 7200 }
 ```
 
 ### Monotonic Time
@@ -139,10 +139,10 @@ const local = t.in(Local);
 const est = t.in(fixedZone("EST", -5 * 3600));
 const berlin = t.in(loadLocation("Europe/Berlin"));
 
-console.log(utc.zone()); // ["UTC", 0]
-console.log(local.zone()); // e.g. ["Local", -25200]
-console.log(est.zone()); // ["EST", -18000]
-console.log(berlin.zone()); // e.g. ["Europe/Berlin", 7200]
+console.log(utc.zone()); // { name: "UTC", offsetSeconds: 0 }
+console.log(local.zone()); // e.g. { name: "Local", offsetSeconds: -25200 }
+console.log(est.zone()); // { name: "EST", offsetSeconds: -18000 }
+console.log(berlin.zone()); // e.g. { name: "Europe/Berlin", offsetSeconds: 7200 }
 ```
 
 ### Timers and Tickers

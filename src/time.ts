@@ -60,6 +60,28 @@ export interface DateFields {
   location?: Location;
 }
 
+export interface ZoneInfo {
+  name: string;
+  offsetSeconds: number;
+}
+
+export interface ClockInfo {
+  hour: number;
+  minute: number;
+  second: number;
+}
+
+export interface DateInfo {
+  year: number;
+  month: Month;
+  day: number;
+}
+
+export interface IsoWeekInfo {
+  year: number;
+  week: number;
+}
+
 /**
  * An immutable point in time with millisecond precision.
  *
@@ -244,25 +266,25 @@ export class Time {
    * Returns the abbreviated time zone name in effect at `t` and its offset
    * in seconds east of UTC.
    *
-   * @returns A tuple `[name, offsetSeconds]`.
+   * @returns An object containing the zone name and offset in seconds.
    */
-  zone(): [string, number] {
+  zone(): ZoneInfo {
     if (this.loc.fixedOffsetSeconds !== undefined) {
-      return [this.loc.name, this.loc.fixedOffsetSeconds];
+      return { name: this.loc.name, offsetSeconds: this.loc.fixedOffsetSeconds };
     }
 
     if (this.loc.name === "UTC") {
-      return ["UTC", 0];
+      return { name: "UTC", offsetSeconds: 0 };
     }
 
     const date = this.toDate();
     if (this.loc.name === "Local") {
       const offsetSeconds = -date.getTimezoneOffset() * 60;
-      return ["Local", offsetSeconds];
+      return { name: "Local", offsetSeconds };
     }
 
     const offsetSeconds = getOffsetSecondsForZone(date, this.loc.name);
-    return [this.loc.name, offsetSeconds];
+    return { name: this.loc.name, offsetSeconds };
   }
 
   /** Returns `true` if `t` is the zero time (epoch milliseconds === 0). */
@@ -303,21 +325,21 @@ export class Time {
   /**
    * Returns the hour, minute, and second of the time of day.
    *
-   * @returns `[hour, minute, second]`.
+   * @returns An object containing the time-of-day fields.
    */
-  clock(): [number, number, number] {
+  clock(): ClockInfo {
     const local = getLocalComponents(this.epochMilliseconds, this.loc);
-    return [local.hour, local.minute, local.second];
+    return { hour: local.hour, minute: local.minute, second: local.second };
   }
 
   /**
    * Returns the year, month, and day of the time.
    *
-   * @returns `[year, month, day]`.
+   * @returns An object containing the calendar date fields.
    */
-  date(): [number, Month, number] {
+  date(): DateInfo {
     const local = getLocalComponents(this.epochMilliseconds, this.loc);
-    return [local.year, local.month as Month, local.day];
+    return { year: local.year, month: local.month as Month, day: local.day };
   }
 
   /** Returns the millisecond offset within the second specified by `t` (0–999). */
@@ -345,9 +367,9 @@ export class Time {
   /**
    * Returns the ISO 8601 year and week number.
    *
-   * @returns `[isoYear, week]` where `week` is in the range 1–53.
+   * @returns An object containing the ISO year and week number.
    */
-  isoWeek(): [number, number] {
+  isoWeek(): IsoWeekInfo {
     const local = getLocalComponents(this.epochMilliseconds, this.loc);
     const weekDate = new Date(Date.UTC(local.year, local.month - 1, local.day));
     const day = weekDate.getUTCDay() || 7;
@@ -355,7 +377,7 @@ export class Time {
     const isoYear = weekDate.getUTCFullYear();
     const yearStart = new Date(Date.UTC(isoYear, 0, 1));
     const week = Math.ceil(((weekDate.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
-    return [isoYear, week];
+    return { year: isoYear, week };
   }
 
   /**
@@ -983,38 +1005,38 @@ function formatAnsic(time: Time): string {
 }
 
 function formatUnixDate(time: Time): string {
-  const [zoneName, offset] = time.zone();
-  return `${weekdayShortName(time.weekday())} ${monthShortName(time.month())} ${padSpace(time.day(), 2)} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${zoneToken(zoneName, offset)} ${time.year()}`;
+  const { name, offsetSeconds } = time.zone();
+  return `${weekdayShortName(time.weekday())} ${monthShortName(time.month())} ${padSpace(time.day(), 2)} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${zoneToken(name, offsetSeconds)} ${time.year()}`;
 }
 
 function formatRubyDate(time: Time): string {
-  const [, offset] = time.zone();
-  return `${weekdayShortName(time.weekday())} ${monthShortName(time.month())} ${pad2(time.day())} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${formatOffset(offset)} ${time.year()}`;
+  const { offsetSeconds } = time.zone();
+  return `${weekdayShortName(time.weekday())} ${monthShortName(time.month())} ${pad2(time.day())} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${formatOffset(offsetSeconds)} ${time.year()}`;
 }
 
 function formatRfc822(time: Time): string {
-  const [zoneName, offset] = time.zone();
-  return `${pad2(time.day())} ${monthShortName(time.month())} ${pad2(time.year() % 100)} ${pad2(time.hour())}:${pad2(time.minute())} ${zoneToken(zoneName, offset)}`;
+  const { name, offsetSeconds } = time.zone();
+  return `${pad2(time.day())} ${monthShortName(time.month())} ${pad2(time.year() % 100)} ${pad2(time.hour())}:${pad2(time.minute())} ${zoneToken(name, offsetSeconds)}`;
 }
 
 function formatRfc822Z(time: Time): string {
-  const [, offset] = time.zone();
-  return `${pad2(time.day())} ${monthShortName(time.month())} ${pad2(time.year() % 100)} ${pad2(time.hour())}:${pad2(time.minute())} ${formatOffset(offset)}`;
+  const { offsetSeconds } = time.zone();
+  return `${pad2(time.day())} ${monthShortName(time.month())} ${pad2(time.year() % 100)} ${pad2(time.hour())}:${pad2(time.minute())} ${formatOffset(offsetSeconds)}`;
 }
 
 function formatRfc850(time: Time): string {
-  const [zoneName, offset] = time.zone();
-  return `${weekdayLongName(time.weekday())}, ${pad2(time.day())}-${monthShortName(time.month())}-${pad2(time.year() % 100)} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${zoneToken(zoneName, offset)}`;
+  const { name, offsetSeconds } = time.zone();
+  return `${weekdayLongName(time.weekday())}, ${pad2(time.day())}-${monthShortName(time.month())}-${pad2(time.year() % 100)} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${zoneToken(name, offsetSeconds)}`;
 }
 
 function formatRfc1123(time: Time): string {
-  const [zoneName, offset] = time.zone();
-  return `${weekdayShortName(time.weekday())}, ${pad2(time.day())} ${monthShortName(time.month())} ${time.year()} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${zoneToken(zoneName, offset)}`;
+  const { name, offsetSeconds } = time.zone();
+  return `${weekdayShortName(time.weekday())}, ${pad2(time.day())} ${monthShortName(time.month())} ${time.year()} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${zoneToken(name, offsetSeconds)}`;
 }
 
 function formatRfc1123Z(time: Time): string {
-  const [, offset] = time.zone();
-  return `${weekdayShortName(time.weekday())}, ${pad2(time.day())} ${monthShortName(time.month())} ${time.year()} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${formatOffset(offset)}`;
+  const { offsetSeconds } = time.zone();
+  return `${weekdayShortName(time.weekday())}, ${pad2(time.day())} ${monthShortName(time.month())} ${time.year()} ${pad2(time.hour())}:${pad2(time.minute())}:${pad2(time.second())} ${formatOffset(offsetSeconds)}`;
 }
 
 function formatKitchen(time: Time): string {
