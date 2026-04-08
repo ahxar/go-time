@@ -1,5 +1,10 @@
 # go-time
 
+[![CI and Release](https://github.com/ahxar/go-time/actions/workflows/ci-release.yml/badge.svg)](https://github.com/ahxar/go-time/actions/workflows/ci-release.yml)
+[![npm version](https://img.shields.io/npm/v/go-time)](https://www.npmjs.com/package/go-time)
+[![npm downloads](https://img.shields.io/npm/dm/go-time)](https://www.npmjs.com/package/go-time)
+[![License](https://img.shields.io/github/license/ahxar/go-time)](LICENSE)
+
 Go-inspired time utilities for Node.js with TypeScript types and zero runtime dependencies.
 
 `go-time` brings familiar Go `time` concepts to JavaScript and TypeScript: durations, layouts, parsing/formatting, locations, timers, and tickers.
