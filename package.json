@@ -1,5 +1,5 @@
 {
-  "name": "go-time",
+  "name": "@ahxar/go-time",
   "version": "1.0.0",
   "description": "Go time-inspired API for Node.js with zero runtime dependencies",
   "type": "module",
