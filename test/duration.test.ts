@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { Duration, Hour, Millisecond, Minute, Second, parseDuration } from "../src/index.js";
+import { Duration, Hour, Minute, Second, parseDuration } from "../src/index.js";
 
 type DurationCase = {
   input: string;
