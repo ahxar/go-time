@@ -78,5 +78,10 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Clear NODE_AUTH_TOKEN for trusted publishing
+        run: echo "NODE_AUTH_TOKEN=" >> "$GITHUB_ENV"
+
       - name: Publish package
+        env:
+          NODE_AUTH_TOKEN: ""
         run: npm publish
