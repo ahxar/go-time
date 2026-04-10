@@ -413,7 +413,7 @@ export class Time {
 
     if (this.loc.fixedOffsetSeconds !== undefined) {
       const offsetMs = this.loc.fixedOffsetSeconds * 1_000;
-      return new Time(result.epochMilliseconds - BigInt(offsetMs) * 1_000n, this.loc);
+      return new Time(result.epochMilliseconds - BigInt(offsetMs), this.loc);
     }
 
     if (this.loc.name === "UTC" || this.loc.name === "Local") {
@@ -422,7 +422,7 @@ export class Time {
 
     const offset = getOffsetSecondsForZone(nextDate, this.loc.name);
     const offsetMs = offset * 1_000;
-    return new Time(result.epochMilliseconds - BigInt(offsetMs) * 1_000n, this.loc);
+    return new Time(result.epochMilliseconds - BigInt(offsetMs), this.loc);
   }
 
   /**

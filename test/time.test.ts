@@ -152,6 +152,9 @@ test("addDate normalizes month rollover", () => {
   expect(next.year()).toBe(2021);
   expect(next.month()).toBe(Month.March);
   expect(next.day()).toBe(3);
+
+  const zoned = date(2021, Month.January, 31, 12, 0, 0, 0, plus2);
+  expect(zoned.addDate(0, 0, 0).unixMilli()).toBe(zoned.unixMilli());
 });
 
 test("format and parse roundtrip for supported layouts", () => {
