@@ -7,7 +7,6 @@ import {
   RFC3339,
   RFC822,
   RFC1123,
-  Second,
   Stamp,
   StampMilli,
   TimeOnly,
@@ -21,7 +20,6 @@ import {
   unixMilli,
   until,
   UTC,
-  Local,
   loadLocation,
   parseDuration,
 } from "../src/index.js";
