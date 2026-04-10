@@ -69,21 +69,12 @@ console.log(
   "same instant represented in NYC/Tokyo should be equal (expected true):",
   sameNyc.equal(sameTokyo),
 );
-console.log(
-  "same instant UTC before NYC? should be false:",
-  sameUtc.before(sameNyc),
-);
-console.log(
-  "same instant UTC after NYC? should be false:",
-  sameUtc.after(sameNyc),
-);
+console.log("same instant UTC before NYC? should be false:", sameUtc.before(sameNyc));
+console.log("same instant UTC after NYC? should be false:", sameUtc.after(sameNyc));
 
 const laterUtc = sameUtc.add(parseDuration("1m"));
 const laterNyc = laterUtc.in(newYork);
-console.log(
-  "later instant (+1m) UTC after original NYC should be true:",
-  laterUtc.after(sameNyc),
-);
+console.log("later instant (+1m) UTC after original NYC should be true:", laterUtc.after(sameNyc));
 console.log(
   "later instant (+1m) NYC after original Tokyo should be true:",
   laterNyc.after(sameTokyo),
