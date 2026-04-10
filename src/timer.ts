@@ -251,9 +251,7 @@ export function tick(d: DurationInput): AsyncIterable<Time> | null {
   }
 
   const ticker = newTicker(d);
-  (
-    ticker as unknown as { interval: NodeJS.Timeout | null }
-  ).interval?.unref?.();
+  (ticker as unknown as { interval: NodeJS.Timeout | null }).interval?.unref?.();
   return ticker.C;
 }
 

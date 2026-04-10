@@ -115,11 +115,7 @@ export class Time {
    * @param loc - The time zone location to associate with the instant.
    */
   constructor(epochMilliseconds: bigint, loc?: Location);
-  constructor(
-    epochMilliseconds: bigint,
-    loc: Location = UTC,
-    monotonicMilliseconds?: bigint,
-  ) {
+  constructor(epochMilliseconds: bigint, loc: Location = UTC, monotonicMilliseconds?: bigint) {
     this.epochMilliseconds = normalizeEpochMilliseconds(epochMilliseconds);
     this.loc = loc;
     this.monotonicMilliseconds =
@@ -151,13 +147,8 @@ export class Time {
    * @param other - The time to subtract.
    */
   sub(other: Time): Duration {
-    if (
-      this.monotonicMilliseconds !== undefined &&
-      other.monotonicMilliseconds !== undefined
-    ) {
-      return new Duration(
-        this.monotonicMilliseconds - other.monotonicMilliseconds,
-      );
+    if (this.monotonicMilliseconds !== undefined && other.monotonicMilliseconds !== undefined) {
+      return new Duration(this.monotonicMilliseconds - other.monotonicMilliseconds);
     }
     return new Duration(this.epochMilliseconds - other.epochMilliseconds);
   }
@@ -365,9 +356,7 @@ export class Time {
   /** Returns the day of the week in which `t` occurs. */
   weekday(): Weekday {
     const local = getLocalComponents(this.epochMilliseconds, this.loc);
-    const localDate = new Date(
-      Date.UTC(local.year, local.month - 1, local.day),
-    );
+    const localDate = new Date(Date.UTC(local.year, local.month - 1, local.day));
     return localDate.getUTCDay() as Weekday;
   }
 
@@ -391,9 +380,7 @@ export class Time {
     weekDate.setUTCDate(weekDate.getUTCDate() + 4 - day);
     const isoYear = weekDate.getUTCFullYear();
     const yearStart = new Date(Date.UTC(isoYear, 0, 1));
-    const week = Math.ceil(
-      ((weekDate.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7,
-    );
+    const week = Math.ceil(((weekDate.getTime() - yearStart.getTime()) / 86_400_000 + 1) / 7);
     return { year: isoYear, week };
   }
 
@@ -426,10 +413,7 @@ export class Time {
 
     if (this.loc.fixedOffsetSeconds !== undefined) {
       const offsetMs = this.loc.fixedOffsetSeconds * 1_000;
-      return new Time(
-        result.epochMilliseconds - BigInt(offsetMs) * 1_000n,
-        this.loc,
-      );
+      return new Time(result.epochMilliseconds - BigInt(offsetMs) * 1_000n, this.loc);
     }
 
     if (this.loc.name === "UTC" || this.loc.name === "Local") {
@@ -438,10 +422,7 @@ export class Time {
 
     const offset = getOffsetSecondsForZone(nextDate, this.loc.name);
     const offsetMs = offset * 1_000;
-    return new Time(
-      result.epochMilliseconds - BigInt(offsetMs) * 1_000n,
-      this.loc,
-    );
+    return new Time(result.epochMilliseconds - BigInt(offsetMs) * 1_000n, this.loc);
   }
 
   /**
@@ -520,21 +501,10 @@ export function unixMilli(ms: bigint): Time {
  * `date({ year, month, day, hour, minute, second, millisecond, location })`
  */
 export function date(
-  ...args:
-    | [DateFields]
-    | [number, Month, number, number, number, number, number, Location?]
+  ...args: [DateFields] | [number, Month, number, number, number, number, number, Location?]
 ): Time {
   const parts = normalizeDateFields(args);
-  const {
-    year,
-    month,
-    day,
-    hour,
-    minute,
-    second,
-    millisecond,
-    location = UTC,
-  } = parts;
+  const { year, month, day, hour, minute, second, millisecond, location = UTC } = parts;
 
   if (location.fixedOffsetSeconds !== undefined) {
     const utcMs =
@@ -544,40 +514,16 @@ export function date(
   }
 
   if (location.name === "UTC") {
-    const ms = Date.UTC(
-      year,
-      month - 1,
-      day,
-      hour,
-      minute,
-      second,
-      millisecond,
-    );
+    const ms = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
     return new Time(BigInt(ms), location);
   }
 
   if (location.name === "Local") {
-    const localMs = new Date(
-      year,
-      month - 1,
-      day,
-      hour,
-      minute,
-      second,
-      millisecond,
-    ).getTime();
+    const localMs = new Date(year, month - 1, day, hour, minute, second, millisecond).getTime();
     return new Time(BigInt(localMs), location);
   }
 
-  const guessUtc = Date.UTC(
-    year,
-    month - 1,
-    day,
-    hour,
-    minute,
-    second,
-    millisecond,
-  );
+  const guessUtc = Date.UTC(year, month - 1, day, hour, minute, second, millisecond);
   const guessedDate = new Date(guessUtc);
   const offset = getOffsetSecondsForZone(guessedDate, location.name);
   const utcMs = guessUtc - offset * 1_000;
@@ -639,21 +585,9 @@ export function parse(layout: string, value: string): Time {
  * @throws {Error} If the value cannot be parsed with the given layout, or the
  *   layout is unsupported.
  */
-export function parseInLocation(
-  layout: SupportedLayout,
-  value: string,
-  loc: Location,
-): Time;
-export function parseInLocation(
-  layout: string,
-  value: string,
-  loc: Location,
-): Time;
-export function parseInLocation(
-  layout: string,
-  value: string,
-  loc: Location,
-): Time {
+export function parseInLocation(layout: SupportedLayout, value: string, loc: Location): Time;
+export function parseInLocation(layout: string, value: string, loc: Location): Time;
+export function parseInLocation(layout: string, value: string, loc: Location): Time {
   if (layout === RFC3339) {
     return parse(layout, value).in(loc);
   }
@@ -706,28 +640,12 @@ export function parseInLocation(
 
   if (layout === TimeOnly) {
     const timeParts = parseTimeOnlyValue(value);
-    return fromLocationClock(
-      1900,
-      1,
-      1,
-      timeParts.hour,
-      timeParts.minute,
-      timeParts.second,
-      loc,
-    );
+    return fromLocationClock(1900, 1, 1, timeParts.hour, timeParts.minute, timeParts.second, loc);
   }
 
   if (layout === Kitchen) {
     const kitchenParts = parseKitchenValue(value);
-    return fromLocationClock(
-      1900,
-      1,
-      1,
-      kitchenParts.hour,
-      kitchenParts.minute,
-      0,
-      loc,
-    );
+    return fromLocationClock(1900, 1, 1, kitchenParts.hour, kitchenParts.minute, 0, loc);
   }
 
   return parse(layout, value).in(loc);
@@ -762,8 +680,7 @@ function fromLocationClock(
 ): Time {
   if (loc.fixedOffsetSeconds !== undefined) {
     const utcMs =
-      Date.UTC(year, month - 1, day, hour, minute, second, 0) -
-      loc.fixedOffsetSeconds * 1_000;
+      Date.UTC(year, month - 1, day, hour, minute, second, 0) - loc.fixedOffsetSeconds * 1_000;
     return new Time(BigInt(utcMs), loc);
   }
 
@@ -773,15 +690,7 @@ function fromLocationClock(
   }
 
   if (loc.name === "Local") {
-    const localMs = new Date(
-      year,
-      month - 1,
-      day,
-      hour,
-      minute,
-      second,
-      0,
-    ).getTime();
+    const localMs = new Date(year, month - 1, day, hour, minute, second, 0).getTime();
     return new Time(BigInt(localMs), loc);
   }
 
@@ -802,9 +711,7 @@ function getOffsetSecondsForZone(at: Date, timeZone: string): number {
     hour12: false,
   });
 
-  const part = fmt
-    .formatToParts(at)
-    .find((p) => p.type === "timeZoneName")?.value;
+  const part = fmt.formatToParts(at).find((p) => p.type === "timeZoneName")?.value;
   if (!part) {
     return 0;
   }
@@ -875,15 +782,7 @@ function weekdayShortName(weekday: Weekday): string {
 }
 
 function weekdayLongName(weekday: Weekday): string {
-  const names = [
-    "Sunday",
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-  ];
+  const names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
   return names[weekday] ?? "Sunday";
 }
 
@@ -923,10 +822,7 @@ interface LocalComponents {
   offset: number;
 }
 
-function getLocalComponents(
-  epochMilliseconds: bigint,
-  loc: Location,
-): LocalComponents {
+function getLocalComponents(epochMilliseconds: bigint, loc: Location): LocalComponents {
   const utcDate = new Date(Number(epochMilliseconds));
 
   if (loc.fixedOffsetSeconds !== undefined) {
@@ -1050,23 +946,28 @@ function createTimeWithMonotonic(
   monotonicMilliseconds: bigint | undefined,
 ): Time {
   const time = new Time(epochMilliseconds, loc);
-  (
-    time as unknown as { monotonicMilliseconds: bigint | undefined }
-  ).monotonicMilliseconds = monotonicMilliseconds;
+  (time as unknown as { monotonicMilliseconds: bigint | undefined }).monotonicMilliseconds =
+    monotonicMilliseconds;
   return time;
 }
 
 function normalizeDateFields(
-  args:
-    | [DateFields]
-    | [number, Month, number, number, number, number, number, Location?],
+  args: [DateFields] | [number, Month, number, number, number, number, number, Location?],
 ): DateFields {
   if (typeof args[0] === "object") {
     return args[0];
   }
 
-  const [year, month, day, hour, minute, second, millisecond, location] =
-    args as [number, Month, number, number, number, number, number, Location?];
+  const [year, month, day, hour, minute, second, millisecond, location] = args as [
+    number,
+    Month,
+    number,
+    number,
+    number,
+    number,
+    number,
+    Location?,
+  ];
   return location === undefined
     ? { year, month, day, hour, minute, second, millisecond }
     : { year, month, day, hour, minute, second, millisecond, location };
@@ -1074,10 +975,7 @@ function normalizeDateFields(
 
 function formatRfc3339(time: Time): string {
   const location = time.location();
-  if (
-    location.name === "UTC" ||
-    (location.fixedOffsetSeconds === 0 && location.name !== "Local")
-  ) {
+  if (location.name === "UTC" || (location.fixedOffsetSeconds === 0 && location.name !== "Local")) {
     const seconds = time.unixMilli() / MILLISECONDS_PER_SECOND;
     const subSecondMilliseconds = time.unixMilli() % MILLISECONDS_PER_SECOND;
     const normalizedSubSecondMilliseconds =
@@ -1102,8 +1000,7 @@ function formatRfc3339(time: Time): string {
       ? subSecondMilliseconds + MILLISECONDS_PER_SECOND
       : subSecondMilliseconds;
   const ms = Number(normalizedSubSecondMilliseconds);
-  const timePart =
-    ms > 0 ? `${baseTime}.${ms.toString().padStart(3, "0")}` : baseTime;
+  const timePart = ms > 0 ? `${baseTime}.${ms.toString().padStart(3, "0")}` : baseTime;
   return `${datePart}T${timePart}${formatOffsetRfc3339(local.offset)}`;
 }
 
@@ -1223,10 +1120,7 @@ function parseDateTimeValue(value: string): Time {
 }
 
 function parseAnsicValue(value: string): Time {
-  const match =
-    /^(\w{3})\s+(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\s+(\d{4})$/.exec(
-      value,
-    );
+  const match = /^(\w{3})\s+(\w{3})\s+(\d{1,2})\s+(\d{2}):(\d{2}):(\d{2})\s+(\d{4})$/.exec(value);
   if (!match) {
     throw new TypeError(`cannot parse time: ${value}`);
   }
@@ -1264,10 +1158,7 @@ function parseTimeOnlyValue(value: string): ClockParts {
 
 function parseTimeOnly(value: string): Time {
   const parts = parseTimeOnlyValue(value);
-  return new Time(
-    BigInt(Date.UTC(0, 0, 1, parts.hour, parts.minute, parts.second, 0)),
-    UTC,
-  );
+  return new Time(BigInt(Date.UTC(0, 0, 1, parts.hour, parts.minute, parts.second, 0)), UTC);
 }
 
 function parseKitchenValue(value: string): ClockParts {
@@ -1285,10 +1176,7 @@ function parseKitchenValue(value: string): ClockParts {
 
 function parseKitchen(value: string): Time {
   const parts = parseKitchenValue(value);
-  return new Time(
-    BigInt(Date.UTC(0, 0, 1, parts.hour, parts.minute, 0, 0)),
-    UTC,
-  );
+  return new Time(BigInt(Date.UTC(0, 0, 1, parts.hour, parts.minute, 0, 0)), UTC);
 }
 
 function parseStampValue(value: string, withMilliseconds: boolean): Time {
@@ -1315,12 +1203,7 @@ function parseStampValue(value: string, withMilliseconds: boolean): Time {
   return new Time(BigInt(createUtcTimestamp(parts, value)), UTC);
 }
 
-function parseTimeComponent(
-  raw: string,
-  min: number,
-  max: number,
-  value: string,
-): number {
+function parseTimeComponent(raw: string, min: number, max: number, value: string): number {
   const parsed = Number(raw);
   if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
     throw new TypeError(`cannot parse time: ${value}`);
@@ -1344,23 +1227,14 @@ function assertValidDateTimeParts(parts: DateTimeParts, value: string): void {
   if (month < 1 || month > 12) {
     throw new TypeError(`cannot parse time: ${value}`);
   }
-  if (
-    hour < 0 ||
-    hour > 23 ||
-    minute < 0 ||
-    minute > 59 ||
-    second < 0 ||
-    second > 59
-  ) {
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59 || second < 0 || second > 59) {
     throw new TypeError(`cannot parse time: ${value}`);
   }
   if (millisecond < 0 || millisecond > 999 || day < 1 || day > 31) {
     throw new TypeError(`cannot parse time: ${value}`);
   }
 
-  const candidate = new Date(
-    Date.UTC(0, month - 1, day, hour, minute, second, millisecond),
-  );
+  const candidate = new Date(Date.UTC(0, month - 1, day, hour, minute, second, millisecond));
   candidate.setUTCFullYear(year);
   if (
     candidate.getUTCFullYear() !== year ||
@@ -1378,9 +1252,7 @@ function assertValidDateTimeParts(parts: DateTimeParts, value: string): void {
 function createUtcTimestamp(parts: DateTimeParts, value: string): number {
   assertValidDateTimeParts(parts, value);
   const { year, month, day, hour, minute, second, millisecond } = parts;
-  const utcDate = new Date(
-    Date.UTC(0, month - 1, day, hour, minute, second, millisecond),
-  );
+  const utcDate = new Date(Date.UTC(0, month - 1, day, hour, minute, second, millisecond));
   utcDate.setUTCFullYear(year);
   return utcDate.getTime();
 }

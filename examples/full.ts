@@ -35,14 +35,11 @@ import {
   StampMilli,
 } from "../src/index.js";
 
-const sep = (title: string) =>
-  console.log(`\n${"─".repeat(50)}\n  ${title}\n${"─".repeat(50)}`);
+const sep = (title: string) => console.log(`\n${"─".repeat(50)}\n  ${title}\n${"─".repeat(50)}`);
 
 sep("1. Duration");
 
-const d1 = new Duration(
-  1n * Hour + 30n * Minute + 5n * Second + 250n * Millisecond,
-);
+const d1 = new Duration(1n * Hour + 30n * Minute + 5n * Second + 250n * Millisecond);
 console.log("1h30m5.25s:", d1.toString());
 console.log("  .hours():", d1.hours());
 console.log("  .minutes():", d1.minutes());
@@ -52,12 +49,7 @@ console.log("  .milliseconds():", d1.milliseconds());
 const d2 = parseDuration("2h45m");
 const d3 = parseDuration("-90m");
 console.log('parseDuration("2h45m"):', d2.toString());
-console.log(
-  'parseDuration("-90m"):',
-  d3.toString(),
-  "abs:",
-  d3.abs().toString(),
-);
+console.log('parseDuration("-90m"):', d3.toString(), "abs:", d3.abs().toString());
 console.log("round to 1h:", d2.round(new Duration(Hour)).toString());
 console.log("truncate to 1h:", d2.truncate(new Duration(Hour)).toString());
 
@@ -101,22 +93,8 @@ console.log('parseInLocation(DateOnly, "2026-04-10", NYC):', p3.toString());
 
 sep("5. Time — fields & arithmetic");
 
-console.log(
-  "year:",
-  fixed.year(),
-  "month:",
-  Month[fixed.month()],
-  "day:",
-  fixed.day(),
-);
-console.log(
-  "hour:",
-  fixed.hour(),
-  "minute:",
-  fixed.minute(),
-  "second:",
-  fixed.second(),
-);
+console.log("year:", fixed.year(), "month:", Month[fixed.month()], "day:", fixed.day());
+console.log("hour:", fixed.hour(), "minute:", fixed.minute(), "second:", fixed.second());
 console.log("weekday:", Weekday[fixed.weekday()], "yearDay:", fixed.yearDay());
 console.log("isoWeek:", fixed.isoWeek());
 console.log("clock():", fixed.clock());
@@ -148,13 +126,7 @@ console.log("Local:", Local.toString());
 
 const est = fixedZone("EST", -5 * 3600);
 const jst = loadLocation("Asia/Tokyo");
-console.log(
-  'fixedZone("EST", -5h):',
-  est.toString(),
-  "offset:",
-  est.fixedOffsetSeconds,
-  "s",
-);
+console.log('fixedZone("EST", -5h):', est.toString(), "offset:", est.fixedOffsetSeconds, "s");
 console.log('loadLocation("Asia/Tokyo"):', jst.toString());
 
 const utcNoon = date(2026, Month.April, 10, 12, 0, 0, 0, UTC);

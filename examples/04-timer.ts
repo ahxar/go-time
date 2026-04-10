@@ -1,11 +1,4 @@
-import {
-  Millisecond,
-  after,
-  afterFunc,
-  newTicker,
-  newTimer,
-  sleep,
-} from "../src/index.js";
+import { Millisecond, after, afterFunc, newTicker, newTimer, sleep } from "../src/index.js";
 
 console.log("=== Timer & Ticker ===\n");
 

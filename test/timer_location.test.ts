@@ -117,9 +117,7 @@ test("tick returns null for non-positive durations and creates channel for posit
   expect(tick(0n)).toBeNull();
 
   const before = new Set(
-    (
-      process as unknown as { _getActiveHandles: () => object[] }
-    )._getActiveHandles?.() ?? [],
+    (process as unknown as { _getActiveHandles: () => object[] })._getActiveHandles?.() ?? [],
   );
   const ch = tick(parseDuration("1ms"));
   expect(ch).not.toBeNull();

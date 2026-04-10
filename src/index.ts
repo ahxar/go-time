@@ -50,12 +50,4 @@ export {
   until,
 } from "./time.js";
 
-export {
-  Ticker,
-  Timer,
-  after,
-  afterFunc,
-  newTicker,
-  newTimer,
-  tick,
-} from "./timer.js";
+export { Ticker, Timer, after, afterFunc, newTicker, newTimer, tick } from "./timer.js";
