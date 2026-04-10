@@ -1369,7 +1369,8 @@ function parseArbitraryLayout(layout: string, value: string, defaultLocation: Lo
         applyGroup.push(() => {});
         break;
       case "January":
-        pattern += "(January|February|March|April|May|June|July|August|September|October|November|December)";
+        pattern +=
+          "(January|February|March|April|May|June|July|August|September|October|November|December)";
         applyGroup.push((raw, state) => {
           const month = monthFromLongName(raw);
           if (month === null) {
@@ -1551,10 +1552,7 @@ function parseArbitraryLayout(layout: string, value: string, defaultLocation: Lo
     applyGroup[i]?.(match[i + 1] ?? "", state);
   }
 
-  const year =
-    state.year ?? (state.shortYear === undefined
-        ? 0
-        : toFourDigitYear(state.shortYear));
+  const year = state.year ?? (state.shortYear === undefined ? 0 : toFourDigitYear(state.shortYear));
   const month = state.month ?? 1;
   const day = state.day ?? 1;
   const minute = state.minute ?? 0;
@@ -1569,7 +1567,7 @@ function parseArbitraryLayout(layout: string, value: string, defaultLocation: Lo
       throw new TypeError(`cannot parse time: ${value}`);
     }
     if (state.ampm === "PM") {
-      hour = state.hour12 % 12 + 12;
+      hour = (state.hour12 % 12) + 12;
     } else {
       hour = state.hour12 % 12;
     }
