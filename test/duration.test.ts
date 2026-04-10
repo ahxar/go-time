@@ -80,7 +80,9 @@ test("Duration abs round and truncate obey step semantics", () => {
   const unchanged = new Duration(123n);
   expect(unchanged.round(new Duration(0n)).milliseconds()).toBe(123n);
   expect(unchanged.truncate(new Duration(-1n)).milliseconds()).toBe(123n);
-  expect(new Duration(2n * Second).round(step).milliseconds()).toBe(2n * Second);
+  expect(new Duration(2n * Second).round(step).milliseconds()).toBe(
+    2n * Second,
+  );
   expect(new Duration(-42n).abs().milliseconds()).toBe(42n);
 });
 

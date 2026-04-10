@@ -72,6 +72,9 @@ test("timer emits, can stop, and can reset", async () => {
   expect(afterReset.unixMilli()).toBeGreaterThan(0n);
   expect(resetTimer.reset(parseDuration("1ms"))).toBe(false);
   await resetTimer.C.recv();
+
+  expect(resetTimer.reset(1n)).toBe(false);
+  await resetTimer.C.recv();
 });
 
 test("after and afterFunc schedule one-shot events", async () => {
@@ -100,16 +103,23 @@ test("ticker ticks, resets, and validates intervals", async () => {
   ticker.reset(parseDuration("1ms"));
   const afterReset = await ticker.C.recv();
   expect(afterReset.unixMilli()).toBeGreaterThan(0n);
+  ticker.reset(1n);
+  const afterBigintReset = await ticker.C.recv();
+  expect(afterBigintReset.unixMilli()).toBeGreaterThan(0n);
   ticker.stop();
   ticker.stop();
   expect(() => ticker.reset(parseDuration("0s"))).toThrow(/./);
+  expect(() => ticker.reset(0n)).toThrow(/./);
 });
 
 test("tick returns null for non-positive durations and creates channel for positive durations", () => {
   expect(tick(parseDuration("0s"))).toBeNull();
+  expect(tick(0n)).toBeNull();
 
   const before = new Set(
-    (process as unknown as { _getActiveHandles: () => object[] })._getActiveHandles?.() ?? [],
+    (
+      process as unknown as { _getActiveHandles: () => object[] }
+    )._getActiveHandles?.() ?? [],
   );
   const ch = tick(parseDuration("1ms"));
   expect(ch).not.toBeNull();
@@ -128,4 +138,26 @@ test("tick returns null for non-positive durations and creates channel for posit
       clearInterval(handle);
     }
   }
+});
+
+test("timer helpers accept bigint duration inputs", async () => {
+  const when = await after(1n);
+  expect(when.unixMilli()).toBeGreaterThan(0n);
+
+  await new Promise<void>((resolve) => {
+    const timer = afterFunc(1n, () => resolve());
+    expect(timer.stop()).toBe(true);
+    timer.reset(1n);
+  });
+
+  const timer = newTimer(1n);
+  const fired = await timer.C.recv();
+  expect(fired.unixMilli()).toBeGreaterThan(0n);
+
+  const ticker = newTicker(1n);
+  const ticked = await ticker.C.recv();
+  expect(ticked.unixMilli()).toBeGreaterThan(0n);
+  ticker.stop();
+
+  expect(() => newTicker(0n)).toThrow(/./);
 });

@@ -1,4 +1,12 @@
-export { Duration, Hour, Millisecond, Minute, Second, parseDuration } from "./duration.js";
+export {
+  type DurationInput,
+  Duration,
+  Hour,
+  Millisecond,
+  Minute,
+  Second,
+  parseDuration,
+} from "./duration.js";
 
 export {
   ANSIC,
@@ -42,4 +50,12 @@ export {
   until,
 } from "./time.js";
 
-export { Ticker, Timer, after, afterFunc, newTicker, newTimer, tick } from "./timer.js";
+export {
+  Ticker,
+  Timer,
+  after,
+  afterFunc,
+  newTicker,
+  newTimer,
+  tick,
+} from "./timer.js";

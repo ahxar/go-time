@@ -1,4 +1,4 @@
-import { Duration } from "./duration.js";
+import { type DurationInput } from "./duration.js";
 import { Time, now } from "./time.js";
 
 /**
@@ -74,7 +74,7 @@ export class TimeChannel implements AsyncIterable<Time> {
  *
  * @example
  * ```ts
- * const timer = new Timer(parseDuration("1s"));
+ * const timer = new Timer(1_000n);
  * const t = await timer.C.recv();
  * console.log("fired at", t.toString());
  * ```
@@ -87,10 +87,10 @@ export class Timer {
   readonly C: TimeChannel;
 
   /**
-   * @param d - Duration after which the timer fires.
+   * @param d - Either a {@link Duration} or a raw `bigint` millisecond value.
    * @param callback - Optional function to call instead of sending to {@link C}.
    */
-  constructor(d: Duration, callback?: () => void) {
+  constructor(d: DurationInput, callback?: () => void) {
     this.callback = callback;
     this.C = new TimeChannel(1);
 
@@ -116,17 +116,17 @@ export class Timer {
    * was active before the reset, `false` if it had already fired or been
    * stopped.
    *
-   * @param d - The new duration.
+   * @param d - The new duration as {@link Duration} or raw milliseconds.
    */
-  reset(d: Duration): boolean {
+  reset(d: DurationInput): boolean {
     const wasActive = this.stop();
     this.fired = false;
     this.timeout = this.schedule(d);
     return wasActive;
   }
 
-  private schedule(d: Duration): NodeJS.Timeout {
-    const ms = Number(d.milliseconds());
+  private schedule(d: DurationInput): NodeJS.Timeout {
+    const ms = Number(durationToMilliseconds(d));
     const delay = Math.max(0, ms);
     return setTimeout(() => {
       this.fired = true;
@@ -146,7 +146,7 @@ export class Timer {
  *
  * @example
  * ```ts
- * const ticker = new Ticker(parseDuration("500ms"));
+ * const ticker = new Ticker(500n);
  * for await (const t of ticker) {
  *   console.log("tick", t.toString());
  *   ticker.stop();
@@ -160,12 +160,12 @@ export class Ticker {
   readonly C: TimeChannel;
 
   /**
-   * @param d - Interval between ticks. Must be positive.
+   * @param d - Tick interval as {@link Duration} or raw milliseconds. Must be positive.
    * @throws {Error} If `d` is zero or negative.
    */
-  constructor(d: Duration) {
+  constructor(d: DurationInput) {
     this.C = new TimeChannel(1);
-    const ms = Number(d.milliseconds());
+    const ms = Number(durationToMilliseconds(d));
     if (ms <= 0) {
       throw new Error("non-positive interval for new ticker");
     }
@@ -187,12 +187,12 @@ export class Ticker {
   /**
    * Resets the ticker interval to `d`.
    *
-   * @param d - The new interval. Must be positive.
+   * @param d - The new interval as {@link Duration} or raw milliseconds. Must be positive.
    * @throws {Error} If `d` is zero or negative.
    */
-  reset(d: Duration): void {
+  reset(d: DurationInput): void {
     this.stop();
-    const ms = Number(d.milliseconds());
+    const ms = Number(durationToMilliseconds(d));
     if (ms <= 0) {
       throw new Error("non-positive interval for ticker reset");
     }
@@ -210,47 +210,53 @@ export class Ticker {
 /**
  * Returns a promise that resolves with the current time after duration `d`.
  *
- * @param d - How long to wait.
+ * @param d - How long to wait as {@link Duration} or raw milliseconds.
  */
-export function after(d: Duration): Promise<Time> {
+export function after(d: DurationInput): Promise<Time> {
   return new Timer(d).C.recv();
 }
 
 /**
  * Returns a {@link Timer} that calls `f` after duration `d`.
  *
- * @param d - How long to wait.
+ * @param d - How long to wait as {@link Duration} or raw milliseconds.
  * @param f - Function to invoke when the timer fires.
  */
-export function afterFunc(d: Duration, f: () => void): Timer {
+export function afterFunc(d: DurationInput, f: () => void): Timer {
   return new Timer(d, f);
 }
 
 /**
  * Creates and returns a new {@link Timer} that fires after duration `d`.
  *
- * @param d - How long to wait.
+ * @param d - How long to wait as {@link Duration} or raw milliseconds.
  */
-export function newTimer(d: Duration): Timer {
+export function newTimer(d: DurationInput): Timer {
   return new Timer(d);
 }
 
 /**
  * Creates and returns a new {@link Ticker} with interval `d`.
  *
- * @param d - Tick interval. Must be positive.
+ * @param d - Tick interval as {@link Duration} or raw milliseconds. Must be positive.
  * @throws {Error} If `d` is zero or negative.
  */
-export function newTicker(d: Duration): Ticker {
+export function newTicker(d: DurationInput): Ticker {
   return new Ticker(d);
 }
 
-export function tick(d: Duration): AsyncIterable<Time> | null {
-  if (d.milliseconds() <= 0n) {
+export function tick(d: DurationInput): AsyncIterable<Time> | null {
+  if (durationToMilliseconds(d) <= 0n) {
     return null;
   }
 
   const ticker = newTicker(d);
-  (ticker as unknown as { interval: NodeJS.Timeout | null }).interval?.unref?.();
+  (
+    ticker as unknown as { interval: NodeJS.Timeout | null }
+  ).interval?.unref?.();
   return ticker.C;
+}
+
+function durationToMilliseconds(d: DurationInput): bigint {
+  return typeof d === "bigint" ? d : d.milliseconds();
 }

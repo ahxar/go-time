@@ -37,12 +37,12 @@ npm install @ahxar/go-time
 ```ts
 import {
   DateTime,
+  Millisecond,
   Month,
   RFC3339,
   date,
   now,
   parse,
-  parseDuration,
   since,
   sleep,
   unixMilli,
@@ -50,7 +50,7 @@ import {
 
 const started = now();
 
-const timeout = parseDuration("250ms");
+const timeout = 250n * Millisecond;
 await sleep(timeout);
 
 const elapsed = since(started);
@@ -132,16 +132,16 @@ console.log(utc.after(same)); // false
 This makes elapsed-time measurement stable across wall-clock adjustments. Times created with `unix()`, `unixMilli()`, `date()`, or `parse()` do not include monotonic data.
 
 ```ts
-import { now, parseDuration, since, sleep, unix } from "@ahxar/go-time";
+import { Millisecond, Second, now, since, sleep, unix } from "@ahxar/go-time";
 
 const started = now();
-await sleep(parseDuration("25ms"));
+await sleep(25n * Millisecond);
 
 const elapsed = since(started);
 console.log(elapsed.milliseconds()); // about 25
 
 const a = now();
-const b = a.add(parseDuration("1s"));
+const b = a.add(1n * Second);
 console.log(b.sub(a).seconds()); // 1
 
 const wallOnly = unix(1_700_000_000n);
@@ -170,13 +170,13 @@ console.log(berlin.zone()); // e.g. { name: "Europe/Berlin", offsetSeconds: 7200
 ### Timers and Tickers
 
 ```ts
-import { newTicker, newTimer, parseDuration } from "@ahxar/go-time";
+import { Millisecond, newTicker, newTimer } from "@ahxar/go-time";
 
-const timer = newTimer(parseDuration("50ms"));
+const timer = newTimer(50n * Millisecond);
 const firedAt = await timer.C.recv();
 console.log(firedAt.unixMilli()); // e.g. 1775649011123n
 
-const ticker = newTicker(parseDuration("100ms"));
+const ticker = newTicker(100n * Millisecond);
 let count = 0;
 for await (const tick of ticker.C) {
   console.log(tick.unixMilli()); // e.g. 1775649011223n

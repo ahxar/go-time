@@ -1,4 +1,11 @@
-import { Duration, Hour, Millisecond, Minute, Second, parseDuration } from "../src/index.js";
+import {
+  Duration,
+  Hour,
+  Millisecond,
+  Minute,
+  Second,
+  parseDuration,
+} from "../src/index.js";
 
 console.log("=== Duration ===\n");
 
@@ -34,4 +41,7 @@ console.log("1h + 30m =", sum.toString());
 
 const roundUnit = new Duration(Minute);
 console.log("1h30m45.5s rounded to 1m:", parsed.round(roundUnit).toString());
-console.log("1h30m45.5s truncated to 1m:", parsed.truncate(roundUnit).toString());
+console.log(
+  "1h30m45.5s truncated to 1m:",
+  parsed.truncate(roundUnit).toString(),
+);

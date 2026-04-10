@@ -11,6 +11,9 @@ export const Minute = MILLISECONDS_PER_MINUTE;
 /** One hour (60 minutes). */
 export const Hour = MILLISECONDS_PER_HOUR;
 
+/** Accepted duration input for APIs that support raw millisecond values. */
+export type DurationInput = Duration | bigint;
+
 type DurationUnit = {
   suffix: string;
   factor: bigint;
