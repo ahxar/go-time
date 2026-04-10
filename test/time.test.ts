@@ -4,7 +4,6 @@ import {
   ANSIC,
   DateOnly,
   DateTime,
-  Duration,
   Kitchen,
   Month,
   RFC822,
@@ -142,7 +141,7 @@ test("zone behavior includes UTC-like and named IANA locations", () => {
 
 test("Time truncates unsupported sub-millisecond precision", () => {
   const base = unixMilli(1_700_000_000_123n);
-  const rounded = base.add(new Duration(0n));
+  const rounded = base.add(0n);
 
   expect(rounded.unixMilli()).toBe(base.unixMilli());
   expect(rounded.utc().toString()).toBe("2023-11-14T22:13:20.123Z");

@@ -14,6 +14,10 @@ export const Hour = MILLISECONDS_PER_HOUR;
 /** Accepted duration input for APIs that support raw millisecond values. */
 export type DurationInput = Duration | bigint;
 
+export function durationToMilliseconds(d: DurationInput): bigint {
+  return typeof d === "bigint" ? d : d.milliseconds();
+}
+
 type DurationUnit = {
   suffix: string;
   factor: bigint;
@@ -80,8 +84,8 @@ export class Duration {
    *
    * @param m - The rounding unit.
    */
-  round(m: Duration): Duration {
-    const mod = m.milliseconds();
+  round(m: DurationInput): Duration {
+    const mod = durationToMilliseconds(m);
     if (mod <= 0n) {
       return this;
     }
@@ -109,8 +113,8 @@ export class Duration {
    *
    * @param m - The truncation unit.
    */
-  truncate(m: Duration): Duration {
-    const mod = m.milliseconds();
+  truncate(m: DurationInput): Duration {
+    const mod = durationToMilliseconds(m);
     if (mod <= 0n) {
       return this;
     }

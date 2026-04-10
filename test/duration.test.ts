@@ -41,10 +41,10 @@ test("Duration string formatting follows Go-like display behavior", () => {
     { d: new Duration(0n), want: "0s" },
     { d: new Duration(999n), want: "999ms" },
     { d: new Duration(1_500n), want: "1.5s" },
-    { d: new Duration(1n * Hour + 2n * Minute + 3n * Second), want: "1h2m3s" },
+    { d: new Duration(Hour + 2n * Minute + 3n * Second), want: "1h2m3s" },
     { d: new Duration(3n * Second + 100n), want: "3.1s" },
     { d: new Duration(-1_500n), want: "-1.5s" },
-    { d: new Duration(-1n * Second), want: "-1s" },
+    { d: new Duration(-Second), want: "-1s" },
   ];
 
   for (const c of cases) {
@@ -53,7 +53,7 @@ test("Duration string formatting follows Go-like display behavior", () => {
 });
 
 test("Duration abs round and truncate obey step semantics", () => {
-  const step = new Duration(1n * Second);
+  const step = new Duration(Second);
   const values = [
     {
       d: new Duration(3_499n),
@@ -78,8 +78,8 @@ test("Duration abs round and truncate obey step semantics", () => {
   }
 
   const unchanged = new Duration(123n);
-  expect(unchanged.round(new Duration(0n)).milliseconds()).toBe(123n);
-  expect(unchanged.truncate(new Duration(-1n)).milliseconds()).toBe(123n);
+  expect(unchanged.round(0n).milliseconds()).toBe(123n);
+  expect(unchanged.truncate(-1n).milliseconds()).toBe(123n);
   expect(new Duration(2n * Second).round(step).milliseconds()).toBe(2n * Second);
   expect(new Duration(-42n).abs().milliseconds()).toBe(42n);
 });

@@ -2,11 +2,14 @@ import {
   ANSIC,
   DateOnly,
   DateTime,
+  Hour,
   Kitchen,
   Month,
+  Minute,
   RFC3339,
   RFC822,
   RFC1123,
+  Second,
   Stamp,
   StampMilli,
   TimeOnly,
@@ -21,7 +24,6 @@ import {
   until,
   UTC,
   loadLocation,
-  parseDuration,
 } from "../src/index.js";
 
 console.log("=== Time ===\n");
@@ -88,7 +90,7 @@ console.log("clock():", t2.clock());
 console.log("date():", t2.date());
 
 console.log("\n--- Arithmetic ---");
-const oneDay = parseDuration("24h");
+const oneDay = 24n * Hour;
 const tomorrow = t2.add(oneDay);
 console.log("t2 + 24h:", tomorrow.format(DateOnly));
 
@@ -108,11 +110,14 @@ console.log("t2.equal(t2):", t2.equal(t2));
 console.log("t2.compare(tomorrow):", t2.compare(tomorrow));
 
 console.log("\n--- Rounding & Truncation ---");
+const at30s = date(2026, Month.April, 10, 12, 34, 30, 0, UTC);
+console.log("at 30 seconds:", at30s.format(DateTime));
+console.log("truncate to 1m:", at30s.truncate(Minute).format(DateTime));
+console.log("round to 1m:", at30s.round(Minute).format(DateTime));
 const withMs = date(2026, Month.April, 10, 12, 34, 56, 789, UTC);
-console.log("withMs:", withMs.toString());
-console.log("truncate to 1s:", withMs.truncate(parseDuration("1s")).toString());
-console.log("round to 1s:", withMs.round(parseDuration("1s")).toString());
-console.log("truncate to 1m:", withMs.truncate(parseDuration("1m")).toString());
+console.log("with milliseconds:", withMs.toString());
+console.log("truncate to 1s:", withMs.truncate(Second).toString());
+console.log("round to 1s:", withMs.round(Second).toString());
 
 console.log("\n--- Timezone ---");
 console.log("utc():", t2.utc().toString());

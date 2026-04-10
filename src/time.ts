@@ -17,10 +17,10 @@ import {
   TimeOnly,
   UnixDate,
 } from "./layout.js";
-import { Duration, type DurationInput } from "./duration.js";
+import { Duration, Second, durationToMilliseconds, type DurationInput } from "./duration.js";
 import { Local, Location, UTC } from "./location.js";
 
-const MILLISECONDS_PER_SECOND = 1_000n;
+const MILLISECONDS_PER_SECOND = Second;
 
 /** Represents a calendar month (January = 1 … December = 12). */
 export enum Month {
@@ -663,10 +663,6 @@ export function sleep(d: DurationInput): Promise<void> {
     return Promise.resolve();
   }
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function durationToMilliseconds(d: DurationInput): bigint {
-  return typeof d === "bigint" ? d : d.milliseconds();
 }
 
 function fromLocationClock(

@@ -1,4 +1,5 @@
 export {
+  durationToMilliseconds,
   type DurationInput,
   Duration,
   Hour,

@@ -71,15 +71,15 @@ console.log(t3.unixMilli()); // 1700000000123n
 ### Duration
 
 ```ts
-import { Duration, Hour, Minute, Second, parseDuration } from "@ahxar/go-time";
+import { Hour, Minute, Second, parseDuration } from "@ahxar/go-time";
 
 const a = parseDuration("2h45m10.5s");
-const b = new Duration(90n * Second);
-const c = new Duration(1n * Hour + 30n * Minute);
+const b = parseDuration("90s");
+const c = parseDuration("1h30m");
 
 console.log(a.milliseconds()); // 9910500n
-console.log(b.round(new Duration(1n * Second)).toString()); // "1m30s"
-console.log(c.truncate(new Duration(1n * Minute)).toString()); // "1h30m0s"
+console.log(b.round(Second).toString()); // "1m30s"
+console.log(c.truncate(Minute).toString()); // "1h30m0s"
 ```
 
 Supported units: `ms`, `s`, `m`, `h`.
@@ -125,6 +125,18 @@ console.log(utc.before(same)); // false
 console.log(utc.after(same)); // false
 ```
 
+Rounding and truncation to the minute:
+
+```ts
+import { DateTime, Minute, Month, UTC, date } from "@ahxar/go-time";
+
+const at30s = date(2026, Month.April, 8, 12, 34, 30, 0, UTC);
+
+console.log(at30s.format(DateTime)); // "2026-04-08 12:34:30"
+console.log(at30s.truncate(Minute).format(DateTime)); // "2026-04-08 12:34:00"
+console.log(at30s.round(Minute).format(DateTime)); // "2026-04-08 12:35:00"
+```
+
 ### Monotonic Time
 
 `now()` records both wall-clock time and a monotonic reading. When two `Time` values both carry monotonic data, `sub()`, `since()`, and `until()` use the monotonic clock for elapsed-time calculations instead of wall-clock time.
@@ -141,7 +153,7 @@ const elapsed = since(started);
 console.log(elapsed.milliseconds()); // about 25
 
 const a = now();
-const b = a.add(1n * Second);
+const b = a.add(Second);
 console.log(b.sub(a).seconds()); // 1
 
 const wallOnly = unix(1_700_000_000n);

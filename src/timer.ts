@@ -1,4 +1,4 @@
-import { type DurationInput } from "./duration.js";
+import { durationToMilliseconds, type DurationInput } from "./duration.js";
 import { Time, now } from "./time.js";
 
 /**
@@ -253,8 +253,4 @@ export function tick(d: DurationInput): AsyncIterable<Time> | null {
   const ticker = newTicker(d);
   (ticker as unknown as { interval: NodeJS.Timeout | null }).interval?.unref?.();
   return ticker.C;
-}
-
-function durationToMilliseconds(d: DurationInput): bigint {
-  return typeof d === "bigint" ? d : d.milliseconds();
 }

@@ -39,7 +39,7 @@ const sep = (title: string) => console.log(`\n${"─".repeat(50)}\n  ${title}\n$
 
 sep("1. Duration");
 
-const d1 = new Duration(1n * Hour + 30n * Minute + 5n * Second + 250n * Millisecond);
+const d1 = new Duration(Hour + 30n * Minute + 5n * Second + 250n * Millisecond);
 console.log("1h30m5.25s:", d1.toString());
 console.log("  .hours():", d1.hours());
 console.log("  .minutes():", d1.minutes());
@@ -50,8 +50,8 @@ const d2 = parseDuration("2h45m");
 const d3 = parseDuration("-90m");
 console.log('parseDuration("2h45m"):', d2.toString());
 console.log('parseDuration("-90m"):', d3.toString(), "abs:", d3.abs().toString());
-console.log("round to 1h:", d2.round(new Duration(Hour)).toString());
-console.log("truncate to 1h:", d2.truncate(new Duration(Hour)).toString());
+console.log("round to 1h:", d2.round(Hour).toString());
+console.log("truncate to 1h:", d2.truncate(Hour).toString());
 
 sep("2. Time — construction");
 
@@ -110,9 +110,12 @@ console.log("fixed.before(tomorrow):", fixed.before(tomorrow));
 console.log("fixed.after(earlier):", fixed.after(earlier));
 console.log("fixed.compare(tomorrow):", fixed.compare(tomorrow));
 
+const at30s = date(2026, Month.April, 10, 14, 30, 30, 0, UTC);
+console.log("at 30 seconds:", at30s.format(DateTime));
+console.log("truncate to 1m:", at30s.truncate(Minute).format(DateTime));
+console.log("round to 1m:", at30s.round(Minute).format(DateTime));
 const withMs = date(2026, Month.April, 10, 14, 30, 45, 678, UTC);
-console.log("truncate to 1s:", withMs.truncate(1n * Second).toString());
-console.log("round to 1m:", withMs.round(1n * Minute).toString());
+console.log("truncate to 1s:", withMs.truncate(Second).toString());
 
 console.log("since(earlier):", since(earlier).toString());
 console.log("until(tomorrow):", until(tomorrow).toString());

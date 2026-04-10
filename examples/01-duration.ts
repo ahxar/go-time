@@ -32,6 +32,5 @@ console.log("\n--- Arithmetic ---");
 const sum = new Duration(oneHour.milliseconds() + thirtyMin.milliseconds());
 console.log("1h + 30m =", sum.toString());
 
-const roundUnit = new Duration(Minute);
-console.log("1h30m45.5s rounded to 1m:", parsed.round(roundUnit).toString());
-console.log("1h30m45.5s truncated to 1m:", parsed.truncate(roundUnit).toString());
+console.log("1h30m45.5s rounded to 1m:", parsed.round(Minute).toString());
+console.log("1h30m45.5s truncated to 1m:", parsed.truncate(Minute).toString());
