@@ -5,6 +5,7 @@ import {
   DateOnly,
   DateTime,
   Kitchen,
+  Layout,
   Month,
   RFC822,
   RFC822Z,
@@ -181,6 +182,12 @@ test("format and parse roundtrip for supported layouts", () => {
       t: utc,
       stableRoundtrip: true,
     },
+    {
+      layout: Layout,
+      sample: "04/08 12:34:56PM '26 +0000",
+      t: utc,
+      stableRoundtrip: true,
+    },
     { layout: Kitchen, sample: "12:34PM", t: utc, stableRoundtrip: true },
     { layout: Stamp, sample: "Apr  8 12:34:56", t: utc, stableRoundtrip: true },
     {
@@ -317,7 +324,7 @@ test("zone offset parsing falls back safely when Intl parts are missing or unpar
   }
 });
 
-test("parse and format report errors for unsupported or invalid input", () => {
+test("parse and format report errors for invalid input", () => {
   const invalidCases: Array<{ layout: string; value: string }> = [
     { layout: RFC3339, value: "bad" },
     { layout: DateOnly, value: "2026/04/08" },
@@ -350,11 +357,28 @@ test("parse and format report errors for unsupported or invalid input", () => {
   }
 
   expect(() => parse("NOPE", "x")).toThrow(/./);
-  expect(() => unix(0n, 0n).format("NOPE" as string)).toThrow(/./);
+  expect(unix(0n, 0n).format("NOPE" as string)).toBe("NOPE");
 });
 
-test("public entrypoint omits unstable symbols", () => {
-  expect("Layout" in goTime).toBe(false);
+test("arbitrary Go-style layouts can parse and format", () => {
+  const customLayout = "Monday, January 2 2006 3:04:05PM -07:00";
+  const input = "Wednesday, April 8 2026 3:04:05PM +02:00";
+
+  const parsed = parse(customLayout, input);
+  expect(parsed.format(customLayout)).toBe(input);
+
+  const inLoc = parseInLocation("2006/1/2 15:04:05", "2026/4/8 12:30:45", plus2);
+  expect(inLoc.zone()).toEqual({ name: "PLUS2", offsetSeconds: 7200 });
+  expect(inLoc.utc().format(DateTime)).toBe("2026-04-08 10:30:45");
+
+  const milliLayout = "2006-01-02T15:04:05.999Z07:00";
+  const withFraction = parse(milliLayout, "2026-04-08T12:34:56.12+02:00");
+  expect(withFraction.millisecond()).toBe(120);
+  expect(withFraction.format(milliLayout)).toBe("2026-04-08T12:34:56.12+02:00");
+});
+
+test("public entrypoint exposes stable symbols", () => {
+  expect("Layout" in goTime).toBe(true);
   expect("loadLocationFromTZData" in goTime).toBe(false);
 });
 

@@ -11,6 +11,8 @@
  * parse(DateOnly, "2026-04-08");
  * ```
  */
+/** Go reference layout string: `"01/02 03:04:05PM '06 -0700"`. */
+export const Layout = "01/02 03:04:05PM '06 -0700";
 /** ANSI C date format: `"Mon Jan _2 15:04:05 2006"`. */
 export const ANSIC = "Mon Jan _2 15:04:05 2006";
 /** Unix `date` command format: `"Mon Jan _2 15:04:05 MST 2006"`. */
@@ -48,6 +50,7 @@ export type SupportedLayout =
   | typeof DateOnly
   | typeof DateTime
   | typeof Kitchen
+  | typeof Layout
   | typeof RFC3339
   | typeof RFC822
   | typeof RFC822Z

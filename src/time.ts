@@ -440,10 +440,10 @@ export class Time {
   format(layout: string): string;
   format(layout: string): string {
     const formatter = FORMATTERS[layout as SupportedLayout];
-    if (!formatter) {
-      throw new Error(`unsupported layout: ${layout}`);
+    if (formatter) {
+      return formatter(this);
     }
-    return formatter(this);
+    return formatArbitraryLayout(this, layout);
   }
 
   /** Returns the time formatted as {@link RFC3339}. */
@@ -565,10 +565,10 @@ export function parse(layout: SupportedLayout, value: string): Time;
 export function parse(layout: string, value: string): Time;
 export function parse(layout: string, value: string): Time {
   const parser = PARSERS[layout as SupportedLayout];
-  if (!parser) {
-    throw new Error(`unsupported layout: ${layout}`);
+  if (parser) {
+    return parser(value);
   }
-  return parser(value);
+  return parseArbitraryLayout(layout, value, UTC);
 }
 
 /**
@@ -646,6 +646,10 @@ export function parseInLocation(layout: string, value: string, loc: Location): T
   if (layout === Kitchen) {
     const kitchenParts = parseKitchenValue(value);
     return fromLocationClock(1900, 1, 1, kitchenParts.hour, kitchenParts.minute, 0, loc);
+  }
+
+  if (!PARSERS[layout as SupportedLayout]) {
+    return parseArbitraryLayout(layout, value, loc);
   }
 
   return parse(layout, value).in(loc);
@@ -753,6 +757,24 @@ function monthShortName(month: Month): string {
   return names[month - 1] ?? "Jan";
 }
 
+function monthLongName(month: Month): string {
+  const names = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+  ];
+  return names[month - 1] ?? "January";
+}
+
 function monthFromShortName(name: string): number | null {
   const table: Record<string, number> = {
     Jan: 1,
@@ -767,6 +789,25 @@ function monthFromShortName(name: string): number | null {
     Oct: 10,
     Nov: 11,
     Dec: 12,
+  };
+
+  return table[name] ?? null;
+}
+
+function monthFromLongName(name: string): number | null {
+  const table: Record<string, number> = {
+    January: 1,
+    February: 2,
+    March: 3,
+    April: 4,
+    May: 5,
+    June: 6,
+    July: 7,
+    August: 8,
+    September: 9,
+    October: 10,
+    November: 11,
+    December: 12,
   };
 
   return table[name] ?? null;
@@ -900,7 +941,68 @@ interface ClockParts {
 type TimeFormatter = (time: Time) => string;
 type TimeParser = (value: string) => Time;
 
-const FORMATTERS: Record<SupportedLayout, TimeFormatter> = {
+type LayoutPart =
+  | {
+      type: "literal";
+      value: string;
+    }
+  | {
+      type: "token";
+      value: GoLayoutToken;
+    };
+
+type GoLayoutToken =
+  | "Monday"
+  | "Mon"
+  | "January"
+  | "Jan"
+  | "2006"
+  | "06"
+  | "01"
+  | "1"
+  | "_2"
+  | "02"
+  | "2"
+  | "15"
+  | "03"
+  | "3"
+  | "04"
+  | "05"
+  | "PM"
+  | "MST"
+  | "Z07:00"
+  | "-07:00"
+  | "-0700"
+  | ".000"
+  | ".999";
+
+const GO_LAYOUT_TOKENS: GoLayoutToken[] = [
+  "Z07:00",
+  "-07:00",
+  "-0700",
+  "Monday",
+  "January",
+  "2006",
+  ".000",
+  ".999",
+  "MST",
+  "Mon",
+  "Jan",
+  "_2",
+  "02",
+  "15",
+  "03",
+  "04",
+  "05",
+  "06",
+  "01",
+  "PM",
+  "1",
+  "2",
+  "3",
+];
+
+const FORMATTERS: Partial<Record<SupportedLayout, TimeFormatter>> = {
   [RFC3339]: formatRfc3339,
   [DateOnly]: formatDateOnly,
   [TimeOnly]: formatTimeOnly,
@@ -918,7 +1020,7 @@ const FORMATTERS: Record<SupportedLayout, TimeFormatter> = {
   [DateTime]: formatDateTime,
 };
 
-const PARSERS: Record<SupportedLayout, TimeParser> = {
+const PARSERS: Partial<Record<SupportedLayout, TimeParser>> = {
   [RFC3339]: parseRfc3339Value,
   [DateOnly]: parseDateOnlyValue,
   [DateTime]: parseDateTimeValue,
@@ -1067,6 +1169,432 @@ function formatStampMilli(time: Time): string {
 function formatDateTime(time: Time): string {
   const local = getLocalComponents(time.unixMilli(), time.location());
   return `${local.year}-${pad2(local.month)}-${pad2(local.day)} ${pad2(local.hour)}:${pad2(local.minute)}:${pad2(local.second)}`;
+}
+
+function tokenizeGoLayout(layout: string): LayoutPart[] {
+  const parts: LayoutPart[] = [];
+  let i = 0;
+
+  while (i < layout.length) {
+    let matched: GoLayoutToken | null = null;
+    for (const token of GO_LAYOUT_TOKENS) {
+      if (layout.startsWith(token, i)) {
+        matched = token;
+        break;
+      }
+    }
+
+    if (matched) {
+      parts.push({ type: "token", value: matched });
+      i += matched.length;
+      continue;
+    }
+
+    const ch = layout[i] ?? "";
+    const prev = parts.at(-1);
+    if (prev?.type === "literal") {
+      prev.value += ch;
+    } else {
+      parts.push({ type: "literal", value: ch });
+    }
+    i += 1;
+  }
+
+  return parts;
+}
+
+/**
+ * Formats the time according to an arbitrary Go-style layout string. This is a
+ * fallback used when the layout is not one of the supported constants. It is
+ * also used by the supported formatters for convenience.
+ *
+ * The layout string is interpreted as a sequence of literal text and formatting
+ * tokens. The supported tokens are the same as those in Go's `time` package,
+ * with the same semantics. For details, see
+ * https://pkg.go.dev/time#pkg-constants.
+ *
+ * @param time - The time value to format.
+ * @param layout - The Go-style layout string.
+ * @returns The formatted time string.
+ */
+function formatArbitraryLayout(time: Time, layout: string): string {
+  const local = getLocalComponents(time.unixMilli(), time.location());
+  const zone = time.zone();
+
+  let out = "";
+  for (const part of tokenizeGoLayout(layout)) {
+    if (part.type === "literal") {
+      out += part.value;
+      continue;
+    }
+
+    switch (part.value) {
+      case "Monday":
+        out += weekdayLongName(time.weekday());
+        break;
+      case "Mon":
+        out += weekdayShortName(time.weekday());
+        break;
+      case "January":
+        out += monthLongName(time.month());
+        break;
+      case "Jan":
+        out += monthShortName(time.month());
+        break;
+      case "2006":
+        out += local.year.toString().padStart(4, "0");
+        break;
+      case "06":
+        out += pad2(((local.year % 100) + 100) % 100);
+        break;
+      case "01":
+        out += pad2(local.month);
+        break;
+      case "1":
+        out += `${local.month}`;
+        break;
+      case "_2":
+        out += padSpace(local.day, 2);
+        break;
+      case "02":
+        out += pad2(local.day);
+        break;
+      case "2":
+        out += `${local.day}`;
+        break;
+      case "15":
+        out += pad2(local.hour);
+        break;
+      case "03": {
+        const h12 = local.hour % 12 === 0 ? 12 : local.hour % 12;
+        out += pad2(h12);
+        break;
+      }
+      case "3": {
+        const h12 = local.hour % 12 === 0 ? 12 : local.hour % 12;
+        out += `${h12}`;
+        break;
+      }
+      case "04":
+        out += pad2(local.minute);
+        break;
+      case "05":
+        out += pad2(local.second);
+        break;
+      case "PM":
+        out += local.hour >= 12 ? "PM" : "AM";
+        break;
+      case "MST":
+        out += zoneToken(zone.name, zone.offsetSeconds);
+        break;
+      case "-0700":
+        out += formatOffset(zone.offsetSeconds);
+        break;
+      case "-07:00":
+        out += formatOffsetRfc3339(zone.offsetSeconds);
+        break;
+      case "Z07:00":
+        out += zone.offsetSeconds === 0 ? "Z" : formatOffsetRfc3339(zone.offsetSeconds);
+        break;
+      case ".000":
+        out += `.${time.millisecond().toString().padStart(3, "0")}`;
+        break;
+      case ".999": {
+        const frac = time.millisecond().toString().padStart(3, "0").replace(/0+$/, "");
+        out += frac.length > 0 ? `.${frac}` : "";
+        break;
+      }
+    }
+  }
+
+  return out;
+}
+
+type ParsedLayoutState = {
+  year?: number;
+  shortYear?: number;
+  month?: number;
+  day?: number;
+  hour24?: number;
+  hour12?: number;
+  minute?: number;
+  second?: number;
+  millisecond?: number;
+  ampm?: "AM" | "PM";
+  zoneName?: string;
+  zoneOffsetSeconds?: number;
+};
+
+function escapeRegex(value: string): string {
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\$&`);
+}
+
+function parseOffsetSeconds(raw: string): number | null {
+  const compact = /^([+-])(\d{2})(\d{2})$/.exec(raw);
+  if (compact) {
+    const sign = compact[1] === "-" ? -1 : 1;
+    return sign * ((Number(compact[2]) * 60 + Number(compact[3])) * 60);
+  }
+
+  const colon = /^([+-])(\d{2}):(\d{2})$/.exec(raw);
+  if (!colon) {
+    return null;
+  }
+  const sign = colon[1] === "-" ? -1 : 1;
+  return sign * ((Number(colon[2]) * 60 + Number(colon[3])) * 60);
+}
+
+function toFourDigitYear(shortYear: number): number {
+  return shortYear >= 69 ? 1900 + shortYear : 2000 + shortYear;
+}
+
+function parseArbitraryLayout(layout: string, value: string, defaultLocation: Location): Time {
+  const parts = tokenizeGoLayout(layout);
+  let pattern = "^";
+  const applyGroup: Array<(raw: string, state: ParsedLayoutState) => void> = [];
+
+  for (const part of parts) {
+    if (part.type === "literal") {
+      pattern += escapeRegex(part.value);
+      continue;
+    }
+
+    switch (part.value) {
+      case "Monday":
+        pattern += "(Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)";
+        applyGroup.push(() => {});
+        break;
+      case "Mon":
+        pattern += "(Sun|Mon|Tue|Wed|Thu|Fri|Sat)";
+        applyGroup.push(() => {});
+        break;
+      case "January":
+        pattern += "(January|February|March|April|May|June|July|August|September|October|November|December)";
+        applyGroup.push((raw, state) => {
+          const month = monthFromLongName(raw);
+          if (month === null) {
+            throw new TypeError(`cannot parse time: ${value}`);
+          }
+          state.month = month;
+        });
+        break;
+      case "Jan":
+        pattern += "(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)";
+        applyGroup.push((raw, state) => {
+          const month = monthFromShortName(raw);
+          if (month === null) {
+            throw new TypeError(`cannot parse time: ${value}`);
+          }
+          state.month = month;
+        });
+        break;
+      case "2006":
+        pattern += "([0-9]{4})";
+        applyGroup.push((raw, state) => {
+          state.year = Number(raw);
+        });
+        break;
+      case "06":
+        pattern += "([0-9]{2})";
+        applyGroup.push((raw, state) => {
+          state.shortYear = Number(raw);
+        });
+        break;
+      case "01":
+        pattern += "([0-9]{2})";
+        applyGroup.push((raw, state) => {
+          state.month = Number(raw);
+        });
+        break;
+      case "1":
+        pattern += "([0-9]{1,2})";
+        applyGroup.push((raw, state) => {
+          state.month = Number(raw);
+        });
+        break;
+      case "_2":
+        pattern += "( ?[0-9]{1,2})";
+        applyGroup.push((raw, state) => {
+          state.day = Number(raw.trim());
+        });
+        break;
+      case "02":
+        pattern += "([0-9]{2})";
+        applyGroup.push((raw, state) => {
+          state.day = Number(raw);
+        });
+        break;
+      case "2":
+        pattern += "([0-9]{1,2})";
+        applyGroup.push((raw, state) => {
+          state.day = Number(raw);
+        });
+        break;
+      case "15":
+        pattern += "([0-9]{2})";
+        applyGroup.push((raw, state) => {
+          state.hour24 = Number(raw);
+        });
+        break;
+      case "03":
+        pattern += "([0-9]{2})";
+        applyGroup.push((raw, state) => {
+          state.hour12 = Number(raw);
+        });
+        break;
+      case "3":
+        pattern += "([0-9]{1,2})";
+        applyGroup.push((raw, state) => {
+          state.hour12 = Number(raw);
+        });
+        break;
+      case "04":
+        pattern += "([0-9]{2})";
+        applyGroup.push((raw, state) => {
+          state.minute = Number(raw);
+        });
+        break;
+      case "05":
+        pattern += "([0-9]{2})";
+        applyGroup.push((raw, state) => {
+          state.second = Number(raw);
+        });
+        break;
+      case "PM":
+        pattern += "(AM|PM)";
+        applyGroup.push((raw, state) => {
+          state.ampm = raw as "AM" | "PM";
+        });
+        break;
+      case "MST":
+        pattern += "([A-Za-z]{1,5}|[+-][0-9]{4})";
+        applyGroup.push((raw, state) => {
+          const parsedOffset = parseOffsetSeconds(raw);
+          if (parsedOffset !== null) {
+            state.zoneOffsetSeconds = parsedOffset;
+            state.zoneName = raw;
+            return;
+          }
+
+          state.zoneName = raw;
+          if (raw === "UTC" || raw === "GMT") {
+            state.zoneOffsetSeconds = 0;
+          }
+        });
+        break;
+      case "-0700":
+        pattern += "([+-][0-9]{4})";
+        applyGroup.push((raw, state) => {
+          const parsedOffset = parseOffsetSeconds(raw);
+          if (parsedOffset === null) {
+            throw new TypeError(`cannot parse time: ${value}`);
+          }
+          state.zoneOffsetSeconds = parsedOffset;
+          state.zoneName = raw;
+        });
+        break;
+      case "-07:00":
+        pattern += "([+-][0-9]{2}:[0-9]{2})";
+        applyGroup.push((raw, state) => {
+          const parsedOffset = parseOffsetSeconds(raw);
+          if (parsedOffset === null) {
+            throw new TypeError(`cannot parse time: ${value}`);
+          }
+          state.zoneOffsetSeconds = parsedOffset;
+          state.zoneName = raw;
+        });
+        break;
+      case "Z07:00":
+        pattern += "(Z|[+-][0-9]{2}:[0-9]{2})";
+        applyGroup.push((raw, state) => {
+          if (raw === "Z") {
+            state.zoneOffsetSeconds = 0;
+            state.zoneName = "UTC";
+            return;
+          }
+          const parsedOffset = parseOffsetSeconds(raw);
+          if (parsedOffset === null) {
+            throw new TypeError(`cannot parse time: ${value}`);
+          }
+          state.zoneOffsetSeconds = parsedOffset;
+          state.zoneName = raw;
+        });
+        break;
+      case ".000":
+        pattern += String.raw`\.([0-9]{1,3})`;
+        applyGroup.push((raw, state) => {
+          state.millisecond = Number(raw.padEnd(3, "0").slice(0, 3));
+        });
+        break;
+      case ".999":
+        pattern += String.raw`(?:\.([0-9]{1,9}))?`;
+        applyGroup.push((raw, state) => {
+          if (!raw) {
+            state.millisecond = 0;
+            return;
+          }
+          state.millisecond = Number(raw.padEnd(3, "0").slice(0, 3));
+        });
+        break;
+    }
+  }
+
+  pattern += "$";
+  const regex = new RegExp(pattern);
+  const match = regex.exec(value);
+  if (!match) {
+    throw new TypeError(`cannot parse time: ${value}`);
+  }
+
+  const state: ParsedLayoutState = {};
+  for (let i = 0; i < applyGroup.length; i += 1) {
+    applyGroup[i]?.(match[i + 1] ?? "", state);
+  }
+
+  const year =
+    state.year ?? (state.shortYear === undefined
+        ? 0
+        : toFourDigitYear(state.shortYear));
+  const month = state.month ?? 1;
+  const day = state.day ?? 1;
+  const minute = state.minute ?? 0;
+  const second = state.second ?? 0;
+  const millisecond = state.millisecond ?? 0;
+
+  let hour = 0;
+  if (state.hour24 !== undefined) {
+    hour = state.hour24;
+  } else if (state.hour12 !== undefined) {
+    if (state.hour12 < 1 || state.hour12 > 12) {
+      throw new TypeError(`cannot parse time: ${value}`);
+    }
+    if (state.ampm === "PM") {
+      hour = state.hour12 % 12 + 12;
+    } else {
+      hour = state.hour12 % 12;
+    }
+  }
+
+  const partsValue: DateTimeParts = {
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    millisecond,
+  };
+  assertValidDateTimeParts(partsValue, value);
+
+  if (state.zoneOffsetSeconds !== undefined) {
+    const utcMs =
+      Date.UTC(year, month - 1, day, hour, minute, second, millisecond) -
+      state.zoneOffsetSeconds * 1_000;
+    return new Time(BigInt(utcMs), new Location(state.zoneName ?? "UTC", state.zoneOffsetSeconds));
+  }
+
+  const wallClock = fromLocationClock(year, month, day, hour, minute, second, defaultLocation);
+  return wallClock.add(BigInt(millisecond));
 }
 
 function parseWithDateParse(value: string): Time {
