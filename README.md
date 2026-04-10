@@ -111,6 +111,20 @@ const localClock = parseInLocation(DateTime, "2026-04-08 12:00:00", plus2);
 console.log(localClock.zone()); // { name: "PLUS2", offsetSeconds: 7200 }
 ```
 
+`before()`, `after()`, and `equal()` compare the underlying UTC instant, so the location attached to a `Time` value does not affect the result.
+
+```ts
+import { RFC3339, fixedZone, parse } from "@ahxar/go-time";
+
+const utc = parse(RFC3339, "2026-04-08T12:00:00Z");
+const plus2 = fixedZone("PLUS2", 2 * 3600);
+const same = utc.in(plus2); // same instant, displayed as 14:00 PLUS2
+
+console.log(utc.equal(same)); // true  — same UTC instant
+console.log(utc.before(same)); // false
+console.log(utc.after(same)); // false
+```
+
 ### Monotonic Time
 
 `now()` records both wall-clock time and a monotonic reading. When two `Time` values both carry monotonic data, `sub()`, `since()`, and `until()` use the monotonic clock for elapsed-time calculations instead of wall-clock time.

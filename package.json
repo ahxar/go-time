@@ -36,10 +36,16 @@
     "fmt:check": "oxfmt --check .",
     "lint": "oxlint .",
     "lint:fix": "oxlint --fix .",
-    "test": "vitest run"
+    "test": "vitest run",
+    "example:duration": "tsx examples/01-duration.ts",
+    "example:time": "tsx examples/02-time.ts",
+    "example:location": "tsx examples/03-location.ts",
+    "example:timer": "tsx examples/04-timer.ts",
+    "example:full": "tsx examples/full.ts"
   },
   "devDependencies": {
     "@emnapi/runtime": "^1.9.2",
+    "tsx": "^4.19.4",
     "@types/node": "^25.5.2",
     "@vitest/coverage-v8": "^4.1.3",
     "oxfmt": "^0.44.0",
